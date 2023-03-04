@@ -26,8 +26,7 @@ local btn_round_factor: cint = 5
 local function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN}
-local GradColor = @record {c1: Color, c2: Color,}
-local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN}
+local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN} -- GradColor is declared in commons
 
 
 global Button = @record
@@ -116,12 +115,12 @@ function FlatDraw:destroy()
 end
 
 function GradDraw:destroy()
-	-- if self.defBrush ~= nilptr then DeleteObject(self.defBrush) end
-	-- if self.hotBrush ~= nilptr then DeleteObject(self.hotBrush) end
 	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
 	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
 	print("Grad draw resources destroyed")
 end
+
+
 
 function Button:createHandle()
 
