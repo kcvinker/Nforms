@@ -1,0 +1,369 @@
+require "string"
+
+
+##[[
+cinclude "<windows.h>"
+cinclude "<wingdi.h>"
+cinclude "<commctrl.h>"
+
+]]
+
+## linklib "Gdi32"
+## linklib "Comctl32"
+-- Windows Data Types
+    global HANDLE: type = @pointer
+    global PHANDLE: type = @*HANDLE
+    -- global HWND__: type = @pointer  ---  <cimport,nodecl,ctypedef> = @record{ unused: cint }
+    global HWND: type = @HANDLE
+    global HBITMAP: type = @HANDLE
+    global HFONT : type = @HANDLE
+    global HDC : type = @HANDLE
+    global HGDIOBJ : type = @HANDLE
+    global HINSTANCE : type = @HANDLE
+    global HICON : type = @HANDLE
+    global HCURSOR : type = @HANDLE
+    global HBRUSH : type = @HANDLE
+    global HPEN : type = @HANDLE
+    global HMENU : type = @HANDLE
+    global HMODULE : type = @HANDLE
+    global HRGN : type = @HANDLE
+    global HTREEITEM : type = @HANDLE
+    global HRESULT : type = @clong
+
+
+    global INT : type = @cint
+    global UINT : type = @cuint
+    global LONG : type = @clong
+    global INT_PTR : type = @isize
+    global LONG_PTR : type = @isize
+    global LRESULT : type = @clonglong
+    global UINT_PTR: type = @usize -- @culonglong
+    global ULONG_PTR: type = @usize --@culonglong
+    global DWORD : type = @culong
+    global DWORD_PTR : type = @ULONG_PTR
+    global COLORREF : type = @DWORD
+    global WORD: type = @cushort
+    global BOOL: type = @cint
+    global WPARAM : type = @UINT_PTR
+    global LPARAM : type = @LONG_PTR
+    global LPCWSTR : type = @*cwchar_t
+    global LPWSTR: type = @*cwchar_t
+    global WCHAR : type = @cwchar_t
+    global PWCHAR: type = @*cwchar_t
+    global LPBOOL: type = @*cint
+    global PVOID: type = @pointer
+    global LPVOID: type = @pointer
+    global PUINT: type = @*cuint
+    global LPCCH: type = @cstring
+    global LPSTR: type = @cstring
+    global LPCWCH: type = @*cwchar_t
+    global wstring = @record{ data: span(cwchar_t) }
+    global WNDPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
+    global SUBCLASSPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR): LRESULT
+--End of Types
+
+global SW_SHOW : DWORD <comptime> = 5
+
+--Structs
+    global POINT = @record {x : LONG, y : LONG}
+    global MSG = @record {
+        hwnd: HWND,
+        message: UINT,
+        wparam: WPARAM,
+        lparam: LPARAM,
+        time: DWORD,
+        pt: POINT,
+        lPrivate : DWORD
+    }
+    global LPMSG : type = @*MSG
+
+    global WNDCLASSEXW = @record {
+        cbSize : UINT,
+        style : DWORD,
+        lpfnWndProc : WNDPROC,
+        cbClsExtra : INT,
+        cbWndExtra : INT,
+        hInstance : HINSTANCE,
+        hIcon : HICON,
+        hCursor : HCURSOR,
+        hbrBackground : HBRUSH,
+        lpszMenuName : LPCWSTR,
+        lpszClassName : LPCWSTR,
+        hIconSm : HICON
+    }
+    global LPWNDCLASSEXW = @*WNDCLASSEXW
+
+    global RECT = @record { left: LONG, top: LONG, right: LONG, bottom: LONG }
+    global LPRECT = @*RECT
+
+    global INITCOMMONCONTROLSEX = @record {
+        dwSize : DWORD,
+        dwICC : DWORD
+    }
+    global LPINITCOMMONCONTROLSEX = @*INITCOMMONCONTROLSEX
+
+    global NMHDR = @record {
+        hwndFrom : HWND,
+        idFrom : usize,
+        code : usize,
+    }
+    global LPNMHDR = @*NMHDR
+
+    global NMCUSTOMDRAW = @record {
+        hdr : NMHDR,
+        dwDrawStage : DWORD,
+        hdc : HDC,
+        rc : RECT,
+        dwItemSpec : DWORD_PTR,
+        uItemState : usize,
+        lItemParam : LPARAM,
+    }
+    global LPNMCUSTOMDRAW = @*NMCUSTOMDRAW
+
+    global TRACKMOUSEEVENT = @record {
+        cbSize : DWORD,
+        dwFlags : DWORD,
+        hwndTrack : HWND,
+        dwHoverTime : DWORD,
+    }
+    global LPTRACKMOUSEEVENT = @*TRACKMOUSEEVENT
+
+
+--End of Structs
+
+-- Common Constants
+    --GDI Constants
+        global PS_SOLID: cint = 0
+    --End of GDI Constants
+    -- Custom Draw Constants
+        global CDRF_DODEFAULT         :  LRESULT <comptime> = 0
+        global CDRF_NEWFONT           :  LRESULT <comptime> = 2
+        global CDRF_SKIPDEFAULT       :  LRESULT <comptime> = 4
+        global CDRF_DOERASE           :  LRESULT <comptime> = 8
+        global CDRF_NOTIFYPOSTPAINT   :  LRESULT <comptime> = 16
+        global CDRF_NOTIFYITEMDRAW    :  LRESULT <comptime> = 32
+        global CDRF_NOTIFYSUBITEMDRAW :  LRESULT <comptime> = 32
+        global CDRF_NOTIFYPOSTERASE   :  LRESULT <comptime> = 64
+        global CDRF_NOTIFYITEMERASE   :  LRESULT <comptime> = 128
+        global CDRF_SKIPPOSTPAINT     :  LRESULT <comptime> = 256
+
+        global CDDS_PREPAINT      : DWORD <comptime> = 1     -- This comes second
+        global CDDS_POSTPAINT     : DWORD <comptime> = 2     -- this coms last
+        global CDDS_PREERASE      : DWORD <comptime> = 3  -- This comes first
+        global CDDS_POSTERASE     : DWORD <comptime> = 4 -- This is 4rth combined ith pre erase
+        global CDDS_ITEM          : DWORD <comptime> = 65536
+        global CDDS_SUBITEM       : DWORD <comptime> = 0x20000
+        global CDDS_ITEMPOSTERASE : DWORD <comptime> = CDDS_ITEM | CDDS_POSTERASE
+        global CDDS_ITEMPOSTPAINT : DWORD <comptime> = CDDS_ITEM | CDDS_POSTPAINT
+        global CDDS_ITEMPREERASE  : DWORD <comptime> = CDDS_ITEM | CDDS_PREERASE
+        global CDDS_ITEMPREPAINT  : DWORD <comptime> = CDDS_ITEM | CDDS_PREPAINT
+    -- End of Custom Draw Constants
+
+    -- DrawText Constants
+        global DT_BOTTOM : UINT <comptime> =8
+        global DT_CALCRECT : UINT <comptime> =1024
+        global DT_CENTER : UINT <comptime> =1
+        global DT_EDITCONTROL : UINT <comptime> =8192
+        global DT_END_ELLIPSIS : UINT <comptime> =32768
+        global DT_PATH_ELLIPSIS : UINT <comptime> =16384
+        global DT_WORD_ELLIPSIS : UINT <comptime> =0x40000
+        global DT_EXPANDTABS : UINT <comptime> =64
+        global DT_EXTERNALLEADING : UINT <comptime> =512
+        global DT_LEFT : UINT <comptime> =0
+        global DT_MODIFYSTRING : UINT <comptime> =65536
+        global DT_NOCLIP : UINT <comptime> =256
+        global DT_NOPREFIX : UINT <comptime> =2048
+        global DT_RIGHT : UINT <comptime> =2
+        global DT_RTLREADING : UINT <comptime> =131072
+        global DT_SINGLELINE : UINT <comptime> =32
+        global DT_TABSTOP : UINT <comptime> =128
+        global DT_TOP : UINT <comptime> =0
+        global DT_VCENTER : UINT <comptime> =4
+        global DT_WORDBREAK : UINT <comptime> =16
+        global DT_INTERNAL : UINT <comptime> =4096
+        global DT_NOFULLWIDTHCHARBREAK : UINT <comptime> = 0x00080000
+        global DT_HIDEPREFIX : UINT <comptime> = 0x00100000
+        global DT_PREFIXONLY : UINT <comptime> = 0x00200000
+    -- End of DrawText Constants
+-- End of Common Constants
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+local function MultiByteToWideChar(CodePage: cuint, dwFlags: culong, lpMultiByteStr: LPCCH, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint <cimport,cinclude'<windows.h>',nodecl> end
+local function WideCharToMultiByte(CodePage: cuint, dwFlags: culong, lpWideCharStr: LPCWCH, cchWideChar: cint, lpMultiByteStr: LPSTR, cbMultiByte: cint, lpDefaultChar: LPCCH, lpUsedDefaultChar: LPBOOL): cint <cimport,cinclude'<windows.h>',nodecl> end
+
+
+
+
+
+
+
+
+
+global function HandleToULong(h: pointer): culong <cimport,nodecl> end
+global function HandleToLong(h: pointer): clong <cimport,nodecl> end
+global function ULongToHandle(h: culong): pointer <cimport,nodecl> end
+global function LongToHandle(h: clong): pointer <cimport,nodecl> end
+global function PtrToUlong(p: pointer): culong <cimport,nodecl> end
+global function PtrToUint(p: pointer): cuint <cimport,nodecl> end
+global function PtrToUshort(p: pointer): cushort <cimport,nodecl> end
+global function PtrToLong(p: pointer): clong <cimport,nodecl> end
+global function PtrToInt(p: pointer): cint <cimport,nodecl> end
+global function PtrToShort(p: pointer): cshort <cimport,nodecl> end
+global function IntToPtr(i: cint): pointer <cimport,nodecl> end
+global function UIntToPtr(ui: cuint): pointer <cimport,nodecl> end
+global function LongToPtr(l: clong): pointer <cimport,nodecl> end
+global function ULongToPtr(ul: culong): pointer <cimport,nodecl> end
+global function Ptr32ToPtr(p: pointer): pointer <cimport,nodecl> end
+global function Handle32ToHandle(h: pointer): pointer <cimport,nodecl> end
+global function PtrToPtr32(p: pointer): pointer <cimport,nodecl> end
+
+
+
+
+
+
+
+
+global WC_BUTTONW : *cwchar_t
+
+local CP_UTF8: cuint <comptime> = 65001
+local function utf8_to_utf16(s: string): wstring
+    local len: cint = MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, nilptr, 0)
+    --if len <= 0 then return wstring{} end -- empty or failed
+    local data: span(cwchar_t) = default_allocator:spanalloc(@cwchar_t, len+1) -- allocate 1 extra for 0
+    if MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, &data[0], len) ~= len then -- failed?
+    default_allocator:spandealloc(data)
+    return wstring{}
+    end
+    data[len] = 0 -- set 0
+    return (@wstring){data=data}
+end
+global function wstrPtr(str : string) : LPCWSTR
+    local result : wstring = utf8_to_utf16(str)
+    return &result.data[0]
+end
+
+global function toWstrArray(str: string): wstring
+    return utf8_to_utf16(str)
+end
+
+
+global function makeIntResW(i : auto) : LPCWSTR return (@LPCWSTR)((pointer)((@*culong)(i))) end
+global IDI_APPLICATION = makeIntResW(32512) --(@LPCWSTR)(p_res_id)
+global IDC_ARROW = makeIntResW(32512) --makeIntResW(32512) --(@LPCWSTR)(p_res_id)
+
+--global function LoadLibraryExW(lpLibFileName: LPCWSTR, hFile: HANDLE, dwFlags: culong): HMODULE <cimport,nodecl> end
+--global function GetModuleHandleExW(dwFlags: culong, lpModuleName: LPCWSTR, phModule: *HMODULE): cint <cimport,nodecl> end
+global function GetModuleHandleW(lpModuleName: LPCWSTR): HMODULE <cimport,nodecl> end
+--global function LoadLibraryW(lpLibFileName: LPCWSTR): HMODULE <cimport,nodecl> end
+--global function FreeLibrary(hLibModule: HMODULE): cint <cimport,nodecl> end
+
+--global function InitCommonControls(): void <cimport,nodecl> end
+--global function InitCommonControlsEx(piccEx : LPINITCOMMONCONTROLSEX): BOOL <cimport,cinclude'<commctrl.h>',nodecl> end
+--global function SetWindowTheme(hWnd: HWND, sApp : LPCWSTR, subId : LPCWSTR): HRESULT <cimport,nodecl> end
+global function Sleep(dwMilliseconds: culong): void <cimport,nodecl> end
+global function Beep(dwFreq: culong, dwDuration: culong): cint <cimport,nodecl> end
+
+-- global function FormatMessageW(dwFlags: culong, lpSource: LPCVOID, dwMessageId: culong, dwLanguageId: culong, lpBuffer: LPWSTR, nSize: culong, Arguments: *cvalist): culong <cimport,nodecl> end
+
+global function GetSystemMetrics(nIndex: cint): cint <cimport,nodecl> end
+global function DeleteDC(hdc: HDC): cint <cimport,nodecl> end
+global function DeleteObject(ho: HGDIOBJ): cint <cimport,nodecl> end
+global function GetMessageW(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: cuint, wMsgFilterMax: cuint): cint <cimport,nodecl> end
+global function TranslateMessage(lpMsg: LPMSG): clonglong <cimport,nodecl> end
+global function DispatchMessageW(lpMsg: LPMSG): clonglong <cimport,nodecl> end
+global function SendMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
+global function PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
+global function DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
+global function TrackMouseEvent(lpEventTrack: LPTRACKMOUSEEVENT): BOOL <cimport,nodecl> end
+
+global function RegisterClassExW(a1: LPWNDCLASSEXW): cushort <cimport,nodecl> end
+
+global function CreateWindowExW(dwExStyle: DWORD, lpClassName: LPCWSTR,
+                                lpWindowName: LPCWSTR, dwStyle: DWORD,
+                                X: cint, Y: cint, nWidth: cint, nHeight: cint,
+                                hWndParent: HWND, hMenu: HMENU,
+                                hInstance: HINSTANCE, lpParam: LPVOID): HWND <cimport,nodecl> end
+
+global function DestroyWindow(hWnd: HWND): cint <cimport,nodecl> end
+global function ShowWindow(hWnd: HWND, nCmdShow: cint): cint <cimport,nodecl> end
+global function AnimateWindow(hWnd: HWND, dwTime: culong, dwFlags: culong): cint <cimport,nodecl> end
+global function GetDC(hWnd: HWND): HDC <cimport,nodecl> end
+global function ReleaseDC(hWnd: HWND, hDC: HDC): cint <cimport,nodecl> end
+global function MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: cuint): cint <cimport,nodecl> end
+global function LoadIconW(hInstance: HINSTANCE, lpIconName: LPCWSTR): HICON <cimport,nodecl> end
+global function LoadIconA(hInstance: HINSTANCE, lpIconName: *cstring): HICON <cimport,nodecl> end
+
+global function LoadCursorW(hInstance: HINSTANCE, lpCursorName: LPCWSTR): HCURSOR <cimport,nodecl> end
+global function LoadCursorA(hInstance: HINSTANCE, lpCursorName: *cstring): HCURSOR <cimport,nodecl> end
+
+global function SetWindowLongPtrW(hWnd: HWND, nIndex: cint, dwNewLong : LONG_PTR): LONG_PTR <cimport,nodecl> end
+global function GetWindowLongPtrW(hWnd: HWND, nIndex: cint): LONG_PTR <cimport,nodecl> end
+
+global function DefWindowProcW(hWnd: HWND, Msg: UINT, wParam : WPARAM, lParam : LPARAM): LRESULT <cimport,nodecl> end
+global function PostQuitMessage(nExitCode: cint) <cimport,nodecl> end
+global function GetDC(hWnd: HWND) : HDC <cimport,nodecl> end
+global function GetModuleHandleW(lpModuleName: LPCWSTR) : HMODULE <cimport,nodecl> end
+global function GetSystemMetrics(nIndex: cint) : cint <cimport,nodecl> end
+global function CreateSolidBrush(color: COLORREF) : HBRUSH <cimport,nodecl> end
+global function GetLastError(): DWORD <cimport,nodecl> end
+global function UpdateWindow(hWnd: HWND): BOOL <cimport,nodecl> end
+global function InvalidateRect(hWnd: HWND, lpRect: LPRECT, bErase: BOOL): BOOL <cimport,nodecl> end
+global function FillRect(hDc: HDC, lprc: LPRECT, hbr: HBRUSH): cint <cimport,nodecl> end
+global function GetClientRect(hWnd: HWND, lprc: LPRECT): BOOL <cimport,nodecl> end
+
+
+global function SetWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR): BOOL <cimport,nodecl> end
+global function RemoveWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR): BOOL <cimport,nodecl> end
+global function DefSubclassProc(hWnd: HWND, uMsg: UINT, wParam: WPARAM, lParam: LPARAM): LRESULT <cimport,nodecl> end
+
+
+global function SetTextColor(hdc: HDC, clr: COLORREF): COLORREF <cimport,nodecl> end
+global function SetBkMode(hdc: HDC, mode: cint): cint <cimport,nodecl> end
+global function DrawTextW(hdc: HDC, lpchText: LPCWSTR, cchText: cint, lprc: LPRECT, format: UINT ): cint <cimport,nodecl> end
+global function SelectObject(hdc: HDC, h: HGDIOBJ): HGDIOBJ <cimport,nodecl> end
+global function RoundRect(hdc: HDC, left: cint, top: cint, right: cint, bottom: cint, width: cint, heighy: cint): BOOL <cimport,nodecl> end
+global function FillPath(hdc: HDC): BOOL <cimport,nodecl> end
+global function CreatePen(iStyle: cint, cWidth: cint, color: COLORREF): HPEN <cimport,nodecl> end
+global function CreateCompatibleDC(hdc: HDC): HDC <cimport,nodecl> end
+global function CreateCompatibleBitmap(hdc: HDC, cx: cint, cy: cint): HBITMAP <cimport,nodecl> end
+global function CreatePatternBrush(hbm: HBITMAP): HBRUSH <cimport,nodecl> end
+
+
+
+
+
+--Utility Funcs
+
+    local function utf16_to_utf8(ws: wstring): string
+        local len: cint = WideCharToMultiByte(CP_UTF8, 0, ws.data.data, ws.data.size, nilptr, 0, nilptr, nilptr)
+        if len <= 0 then return string{} end -- empty or failed
+        local s: string = string.create(len)
+        if WideCharToMultiByte(CP_UTF8, 0, ws.data.data, ws.data.size, s.data, len, nilptr, nilptr) ~= len then -- failed?
+            s:destroy()
+            return string{}
+        end
+        return s
+    end
+
+
+--End Utility funcs
+
+
+
+
+
+
