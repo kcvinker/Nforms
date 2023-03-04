@@ -1,0 +1,111 @@
+--font module - Created on 28-Feb-2023 08:57 AM
+
+require "nforms.apifuncs"
+
+local DEFAULT_CHARSET : byte <comptime> = 1
+local OUT_DEFAULT_PRECIS : byte <comptime> = 0
+local CLIP_DEFAULT_PRECIS : byte <comptime> = 0
+local DEFAULT_QUALITY : byte <comptime> = 0
+local DEFAULT_PITCH : byte <comptime> = 0
+local LOGPIXELSY : cint = 90
+-- local DEFAULT_CHARSET : byte <comptime> = 1
+-- local DEFAULT_CHARSET : byte <comptime> = 1
+-- local DEFAULT_CHARSET : byte <comptime> = 1
+-- local DEFAULT_CHARSET : byte <comptime> = 1
+
+global FontWight = @enum {Thin = 100, ExtraLight = 200, Light = 300, Normal = 400, Medium = 500, SemiBold = 600, Bold = 700, ExtraBold = 800, Thick = 900}
+
+local LOGFONTW = @record
+{
+	lfHeight : LONG,
+	lfWidth : LONG,
+	lfEscapement : LONG,
+	lfOrientation : LONG,
+	lfWeight : LONG,
+	lfItalic : byte,
+	lfUnderline : byte,
+	lfStrikeOut : byte,
+	lfCharSet : byte,
+	lfOutPrecision : byte,
+	lfClipPrecision : byte,
+	lfQuality : byte,
+	lfPitchAndFamily : byte,
+	lfFaceName : [32]WCHAR,
+}
+local LPLOGFONTW = @*LOGFONTW
+
+local function CreateFontW(cHeight: cint, cWidth: cint, cEscapement: cint, cOrientation: cint, cWeight: cint, bItalic: culong, bUnderline: culong, bStrikeOut: culong, iCharSet: culong, iOutPrecision: culong, iClipPrecision: culong, iQuality: culong, iPitchAndFamily: culong, pszFaceName: LPCWSTR): HFONT <cimport,nodecl> end
+local function CreateFontIndirectW(lpLf : LPLOGFONTW): HFONT <cimport,nodecl> end
+local function GetDeviceCaps(hdc: HDC, index: cint) : cint <cimport,nodecl> end
+local function MulDiv(nNumber: cint, nNumerator: cint, nDenominator: cint): cint <cimport,nodecl> end
+
+global Font = @record
+{
+	name: string,
+	size: integer,
+	weight: FontWight,
+	italics: boolean,
+	underline: boolean,
+	strikeOut: boolean,
+	handle: HWND,
+}
+
+function Font.new(fname: string, fsize: integer, fweight: FontWight, ital: boolean, under: boolean, strike: boolean): Font
+	local this: Font
+	this.name = fname == "" and "Tahoma" or fname
+	this.size = fsize == 0 and 12 or fsize
+	this.weight = fweight == 0 and FontWight.Normal or fweight
+	this.italics = ital
+	this.underline = under
+	this.strikeOut = strike	
+
+	return this	
+end
+
+function Font:init()
+	self.name = "Tahoma"
+	self.size = 12
+	self.weight = FontWight.Normal
+end
+
+function Font:createHandle(hwnd: HWND)
+	local hdc : HDC = GetDC(hwnd)
+	local fontHeight: LONG = -MulDiv(self.size, GetDeviceCaps(hdc, LOGPIXELSY), 72)
+	ReleaseDC(hwnd, hdc)
+	local fname: [32]WCHAR
+	local wfname = toWstrArray(self.name)
+	
+	for i, v in ipairs(wfname.data) do 
+		if i > 32 then break end
+		fname[i] =  v
+	end
+	local lf : LOGFONTW
+	lf.lfItalic = self.italics and 1 or 0
+	lf.lfUnderline = self.underline and 1 or 0
+	lf.lfFaceName = fname
+	lf.lfHeight = fontHeight
+	lf.lfWeight = (@LONG)(self.weight)
+	lf.lfCharSet = DEFAULT_CHARSET
+	lf.lfOutPrecision = OUT_DEFAULT_PRECIS
+	lf.lfClipPrecision = CLIP_DEFAULT_PRECIS
+	lf.lfQuality = DEFAULT_QUALITY
+	lf.lfPitchAndFamily = DEFAULT_PITCH
+	self.handle = CreateFontIndirectW(&lf)	
+end
+
+function Font:createHandleEx(hwnd : HWND) 
+	local hdc : HDC = GetDC(hwnd)
+	local fontHeight: LONG = -MulDiv(self.size, GetDeviceCaps(hdc, LOGPIXELSY), 72)
+	ReleaseDC(hwnd, hdc)
+	local ital: DWORD = self.italics and 1 or 0
+	local under: DWORD = self.underline	and 1 or 0
+	local strike: DWORD = self.strikeOut and 1 or 0
+	self.handle = CreateFontW(fontHeight, 0, 0, 0, (@culong)(self.weight), ital, under, strike, (@DWORD)(1),
+								OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+	 							DEFAULT_QUALITY, DEFAULT_PITCH, wstrPtr(self.name))
+end
+
+function Font:setFontInternal(hwnd: HWND)
+	if self.handle == nilptr then self:createHandle(hwnd) end
+	SendMessageW(hwnd, WM_SETFONT, (@WPARAM)(self.handle), (@LPARAM)(1))
+end
