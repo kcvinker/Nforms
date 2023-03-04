@@ -1,0 +1,267 @@
+
+##[[
+cinclude "<windows.h>"
+--cinclude "<commctrl.h>"
+]]
+
+
+--require "nforms.api_constants"
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+
+local button_count : integer
+local subclass_id : integer = 1001
+
+local BS_NOTIFY <comptime> = 0x00004000
+local BS_DEFPUSHBUTTON <comptime> = 0x00000001
+local b_style <comptime> =  WS_CHILD | BS_NOTIFY | WS_TABSTOP | WS_VISIBLE
+local b_ex_style <comptime> = 0
+local b_txt_flag : UINT <comptime> = DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_HIDEPREFIX
+local mouse_clicked: DWORD_PTR = 0b1
+local mouse_over: DWORD_PTR = 0b1000000
+local btn_round_factor: cint = 5
+local function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN}
+local GradColor = @record {c1: Color, c2: Color,}
+local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN}
+
+
+global Button = @record
+{
+	name : string,
+	className: LPCWSTR,
+	text : string,
+	handle : HWND,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+
+
+	_isCreated: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_fdraw: FlatDraw,
+	_gdraw: GradDraw,
+
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+}
+
+
+function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Button
+	local this : Button
+	this.name = "Button_1"
+	this.className = wstrPtr("Button")
+	this.text = txt == "" and this.name or txt
+	this.width = w == 0 and 120 or w
+	this.height = h == 0 and 35 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = WS_CHILD | WS_TABSTOP | WS_VISIBLE | BS_NOTIFY
+	this._exStyle = 0
+
+	return this
+end
+
+function FlatDraw:init(clr: Color)
+	self.defBrush = CreateSolidBrush(clr.ref)
+	self.hotBrush = CreateSolidBrush(clr:getHotColor2(25).ref)
+	self.defPen = CreatePen(PS_SOLID, 1, clr:getHotColor(0.6).ref)
+	self.hotPen = CreatePen(PS_SOLID, 1, clr:getHotColor(0.3).ref)
+end
+
+function GradDraw:init(c1: uinteger, c2: uinteger)
+	self.defGC.c1 = Color.new(c1)
+	self.defGC.c2 = Color.new(c2)
+
+	local adj1: number = self.defGC.c1:isDark() and 1.5 or 1.2
+	local adj2: number = self.defGC.c2:isDark() and 1.5 or 1.2
+
+	self.hotGC.c1 = self.defGC.c1:changeColor(adj1)
+	self.hotGC.c2 = self.defGC.c2:changeColor(adj2)
+
+	self.defPen = CreatePen(PS_SOLID, 1, self.defGC.c1:getHotColor(0.6).ref)
+	self.hotPen = CreatePen(PS_SOLID, 1, self.defGC.c1:getHotColor(0.3).ref)
+end
+
+function FlatDraw:destroy()
+	if self.defBrush ~= nilptr then DeleteObject(self.defBrush) end
+	if self.hotBrush ~= nilptr then DeleteObject(self.hotBrush) end
+	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
+	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
+	print("flat draw resources destroyed")
+end
+
+function GradDraw:destroy()
+	-- if self.defBrush ~= nilptr then DeleteObject(self.defBrush) end
+	-- if self.hotBrush ~= nilptr then DeleteObject(self.hotBrush) end
+	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
+	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
+	print("Grad draw resources destroyed")
+end
+
+function Button:createHandle()
+
+	createControl(self)
+	-- self.handle = CreateWindowExW(b_ex_style,
+    --                             self.className,
+    --                             wstrPtr(self.text),
+    --                             b_style, self.xpos, self.ypos, self.width, self.height,
+    --                             self.parent.handle, nilptr, self.parent.hInstance, nilptr)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), btnWndProc)
+
+	end
+end
+
+-- function Button.createHandles(... : varargs)
+
+
+
+function Button:destroy()
+	switch self._drawFlag do
+	case 2, 3 then self._fdraw:destroy()
+	case 4, 5 then self._gdraw:destroy()
+	end
+end
+
+function Button:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function Button:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	self._fdraw:init(self.backColor)
+	invalidateNow(self)
+end
+
+function Button:setGradientColor(clr1: uinteger, clr2: uinteger)
+	self._gdraw:init(clr1, clr2)
+	if (self._drawFlag & 4) ~= 4 then self._drawFlag = self._drawFlag + 4 end
+	invalidateNow(self)
+end
+
+local function setBtnForColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESULT
+	SetTextColor(nmcd.hdc, this.foreColor.ref)
+	SetBkMode(nmcd.hdc, 1)
+	DrawTextW(nmcd.hdc, wstrPtr(this.text), -1, &nmcd.rc, b_txt_flag)
+	return CDRF_NOTIFYPOSTPAINT
+end
+
+local function paintFlatButton(hdc: HDC, rc: RECT, hbr: HBRUSH, pen: HPEN)
+	SelectObject(hdc, hbr)
+	SelectObject(hdc, pen)
+	RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, btn_round_factor, btn_round_factor)
+	FillPath(hdc)
+end
+
+local function paintGradientButton(hdc: HDC, rc: RECT, gc: GradColor, pen: HPEN)
+	local gBrush: HBRUSH = createGradientBrush(hdc, rc, gc.c1, gc.c2, true)
+	defer DeleteObject(gBrush) end
+
+	SelectObject(hdc, pen)
+	SelectObject(hdc, gBrush)
+	RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, btn_round_factor, btn_round_factor)
+	FillPath(hdc)
+end
+
+
+local function setBtnBackColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESULT
+	switch nmcd.dwDrawStage do
+	case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
+	case CDDS_PREPAINT then
+		if (nmcd.uItemState & mouse_clicked) == mouse_clicked then
+			paintFlatButton(nmcd.hdc, nmcd.rc, this._fdraw.defBrush, this._fdraw.hotPen)
+		elseif (nmcd.uItemState & mouse_over) == mouse_over then
+			paintFlatButton(nmcd.hdc, nmcd.rc, this._fdraw.hotBrush, this._fdraw.hotPen)
+		else
+			paintFlatButton(nmcd.hdc, nmcd.rc, this._fdraw.defBrush, this._fdraw.defPen)
+		end
+		return CDRF_DODEFAULT
+	end
+	return CDRF_DODEFAULT
+end
+
+local function setBtnGradientColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESULT
+	switch nmcd.dwDrawStage do
+	case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
+	case CDDS_PREPAINT then
+		if (nmcd.uItemState & mouse_clicked) == mouse_clicked then
+			paintGradientButton(nmcd.hdc, nmcd.rc, this._gdraw.defGC, this._gdraw.hotPen)
+		elseif (nmcd.uItemState & mouse_over) == mouse_over then
+			paintGradientButton(nmcd.hdc, nmcd.rc, this._gdraw.hotGC, this._gdraw.hotPen)
+		else
+			paintGradientButton(nmcd.hdc, nmcd.rc, this._gdraw.defGC, this._gdraw.defPen)
+		end
+		return CDRF_DODEFAULT
+	end
+	return CDRF_DODEFAULT
+end
+
+local function btnWmNotifyHandler(this: *Button, lp: LPARAM): LRESULT
+	local ret = CDRF_DODEFAULT
+	if this._drawFlag then
+		local nmcd = (@*NMCUSTOMDRAW)(lp)
+		switch this._drawFlag do
+			case 1 then return setBtnForColorInternal(this, nmcd)
+			case 2 then return setBtnBackColorInternal(this, nmcd)
+			case 3 then
+				setBtnBackColorInternal(this, nmcd)
+				return setBtnForColorInternal(this, nmcd)
+			case 4 then return setBtnGradientColorInternal(this, nmcd)
+			-- case 5 then
+		end
+	end
+	return ret
+end
+
+function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*Button)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, btnWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+
+	case MM_NOTIFY_REFLECT then	return btnWmNotifyHandler(this, lpm)
+
+
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
