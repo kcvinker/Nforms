@@ -66,9 +66,19 @@ global KeyEventArgs = @record {
 }
 
 
+global Area = @record {width: integer, height: integer}
+global SizedPosition = @enum {LeftEdge = 1, RightEdge, TopEdge, TopLeftCorner, TopRightCorner, BottomEdge, BottomLeftCorner, BottomRightCorner,}
+global SizeEventArgs = @record {
+    formRect : LPRECT,
+    sizedOn : SizedPosition,
+    clientArea : Area,
+}
+
+
 global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
 global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
 global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
+global SizeEventHandler = @function(ctrl: pointer, eargs: *SizeEventArgs): void
 
 
 
@@ -102,6 +112,18 @@ function KeyEventArgs.new(wp: WPARAM): KeyEventArgs
         case Keys.Shift then this.shiftPressed = true
         case Keys.Ctrl then this.ctrlPressed = true
         case Keys.Alt then this.altPressed = true
+    end
+    return this
+end
+
+function SizeEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM): SizeEventArgs
+    local this: SizeEventArgs
+    if msg == WM_SIZING then -- When resizing happening
+        this.sizedOn = (@SizedPosition)(wpm)
+        this.formRect = (@LPRECT)(lpm)
+    else  --After resizing finished
+        this.clientArea.width = (@integer)(loWord(lpm))
+        this.clientArea.height = (@integer)(hiWord(lpm))
     end
     return this
 end
