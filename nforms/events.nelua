@@ -99,9 +99,9 @@ function KeyEventArgs.new(wp: WPARAM): KeyEventArgs
     this.keyCode = (@Keys)(wp)
     this.keyValue = (@integer)(wp)
     switch this.keyCode do
-        case Keys.Shift : this.shiftPressed = true
-        case Keys.Ctrl : this.ctrlPressed = true
-        case Keys.Alt : this.altPressed = true
+        case Keys.Shift then this.shiftPressed = true
+        case Keys.Ctrl then this.ctrlPressed = true
+        case Keys.Alt then this.altPressed = true
     end
     return this
 end
