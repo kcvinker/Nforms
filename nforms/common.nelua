@@ -1,0 +1,142 @@
+--common module - Created on 01-Mar-2023 02:58 AM
+
+require "nforms.apifuncs"
+require "nforms.events"
+
+global subClassID : UINT_PTR = 1000 -- global subclass id.
+
+
+
+--My Messages
+	local MM_NUMBER : UINT <comptime> = 9000
+	global MM_MOUSE_LB_CLICK: UINT <comptime> = MM_NUMBER + 1
+	global MM_MOUSE_RB_CLICK: UINT <comptime> = MM_NUMBER + 2
+	global MM_NOTIFY_REFLECT: UINT <comptime> = MM_NUMBER + 3
+--End of My Messages
+
+
+global function createControl(ctrl: auto)
+	local ctrlTxt : LPCWSTR = ctrl.text and wstrPtr(ctrl.text) or nilptr
+	ctrl.handle = CreateWindowExW(ctrl._exStyle, ctrl.className, ctrlTxt, ctrl._style,
+									ctrl.xpos, ctrl.ypos, ctrl.width, ctrl.height,
+                                	ctrl.parent.handle, nilptr, ctrl.parent.hInstance, nilptr)
+	if ctrl.handle ~= nilptr then
+		ctrl._isCreated = true
+		ctrl.font:setFontInternal(ctrl.handle)
+	end
+end
+
+
+--Set subclass for a control type.
+global function setSubClass(hwnd: HWND, pCtrl: pointer, pFunc: SUBCLASSPROC)
+	SetWindowSubclass(hwnd, pFunc, subClassID, (@DWORD_PTR)(pCtrl))
+	subClassID = subClassID + 1
+end
+
+global function suddenRedraw(ctrl: auto)
+	if ctrl._isCreated then InvalidateRect(ctrl.handle, nilptr, 1) end
+end
+
+global function invalidateNow(ctrl: auto)
+	if ctrl._isCreated then InvalidateRect(ctrl.handle, nilptr, 0) end
+end
+
+global function getCRect(c: auto): RECT
+	local rct: RECT
+	GetClientRect(c.handle, &rct)
+	return rct
+end
+
+--Common event handling functions
+	global function leftMouseDownHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		this._lbDown = true
+		if this.onMouseDown ~= nilptr then
+			local mea = MouseEventArgs.new(msg, wp, lp)
+			this.onMouseDown(this, &mea)
+		end
+	end
+
+	global function leftMouseUpHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		if this._lbDown then
+			this._lbDown = false
+			PostMessageW(this.handle, MM_MOUSE_LB_CLICK, 0, 0)
+		end
+		if this.onMouseUp ~= nilptr then
+			local mea = MouseEventArgs.new(msg, wp, lp)
+			this.onMouseUp(this, &mea)
+		end
+	end
+
+	global function leftMouseClickHandler(this: auto)
+		if this.onClick ~= nilptr then
+			local ea : EventArgs = {}
+			this.onClick(this, &ea)
+		end
+	end
+	-- ---------------------------------------------------------------------------
+
+	global function rightMouseDownHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		this._rbDown = true
+		if this.onRightMouseDown ~= nilptr then
+			local mea = MouseEventArgs.new(msg, wp, lp)
+			this.onRightMouseDown(this, &mea)
+		end
+	end
+
+	global function rightMouseUpHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		if this._rbDown then
+			this._rbDown = false
+			PostMessageW(this.handle, MM_MOUSE_RB_CLICK, 0, 0)
+		end
+		if this.onRightMouseUp ~= nilptr then
+			local mea = MouseEventArgs.new(msg, wp, lp)
+			this.onRightMouseUp(this, &mea)
+		end
+	end
+
+	global function rightMouseClickHandler(this: auto)
+		if this.onRightClick ~= nilptr then
+			local ea : EventArgs = {}
+			this.onRightClick(this, &ea)
+		end
+	end
+	-- ----------------------------------------------------------------------------------
+
+	global function mouseScrollHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		if this.onMouseScroll ~= nilptr then
+			local mea = MouseEventArgs.new(msg, wp, lp)
+			this.onMouseScroll(this, &mea)
+		end
+	end
+
+	global function mouseMoveHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		if this._isMouseEntered then
+			if this.onMouseMove ~= nilptr then
+				local mea = MouseEventArgs.new(msg, wp, lp)
+				this.onMouseMove(this, &mea)
+			end
+		else
+			this._isMouseEntered = true
+			if this.onMouseEnter ~= nilptr then
+				local ea = EventArgs {}
+				this.onMouseEnter(this, &ea)
+			end
+		end
+	end
+
+	global function mouseLeaveHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
+		this._isMouseEntered = false
+		if this.onMouseLeave ~= nilptr then
+			local ea = EventArgs {}
+			this.onMouseLeave(this, &ea)
+		end
+	end
+-- End of Event handlers
+
+
+-- Public common setter functions
+	-- global function setForeColor(this: auto, clr: uinteger)
+	-- 	this.foreColor = Color.new(clr)
+	-- 	if (this._drawFlag & 1) ~= 1 then this._drawFlag = this._drawFlag + 1 end
+	-- 	invalidateNow(this)
+	-- end
