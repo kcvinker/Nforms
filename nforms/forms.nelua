@@ -1,0 +1,453 @@
+--forms module - Created on 27-Feb-2023
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.color"
+require "nforms.font"
+require "nforms.common"
+
+
+
+--Window constants
+	local CS_VREDRAW  : DWORD <comptime> = 0x0001
+	local CS_HREDRAW : DWORD <comptime> = 0x0002
+	local CS_OWNDC  : DWORD <comptime> = 0x0020
+	--global CW_USEDEFAULT : culong  <comptime> = -0x8000000
+
+	--Get window long ptr Constants
+	global GWL_EXSTYLE <comptime> = -20
+	global GWLP_HINSTANCE <comptime> = -6
+	global GWLP_ID <comptime> = -12
+	global GWL_STYLE <comptime> = -16
+	global GWLP_USERDATA <comptime> = -21
+	global GWLP_WNDPROC <comptime> = -4
+
+	local SC_MINIMIZE : UINT <comptime> = 0xF020
+	local SC_RESTORE : UINT <comptime> = 0xF120
+	local SC_MAXIMIZE : UINT <comptime> = 0xF030
+
+	local TME_HOVER : DWORD <comptime> = 0x00000001
+	local TME_LEAVE : DWORD <comptime> = 0x00000002
+	local HOVER_DEFAULT : DWORD <comptime> = 0xFFFFFFFF
+
+	-- Window Styles Constants
+	global WS_OVERLAPPED : DWORD <comptime> = 0x00000000
+	global WS_MAXIMIZEBOX : DWORD <comptime> = 0x00010000
+	global WS_MINIMIZEBOX : DWORD <comptime> = 0x00020000
+	global WS_THICKFRAME : DWORD <comptime> = 0x00040000
+	global WS_SYSMENU : DWORD <comptime> = 0x00080000
+	global WS_BORDER : DWORD <comptime> = 0x00800000
+	global WS_CAPTION : DWORD <comptime> = 0x00C00000
+	global WS_VISIBLE : DWORD <comptime> = 0x10000000
+	global WS_POPUP : DWORD <comptime> = 0x80000000
+	global WS_MAXIMIZE : DWORD <comptime> = 0x01000000
+	global WS_MINIMIZE : DWORD <comptime> = 0x20000000
+	global WS_TABSTOP : DWORD <comptime> = 0x00010000
+	global WS_CLIPCHILDREN : DWORD <comptime> = 0x02000000
+	global WS_CLIPSIBLINGS : DWORD <comptime> = 0x04000000
+	global WS_GROUP : DWORD  <comptime> = 0x00020000
+	global WS_DLGFRAME : DWORD  <comptime> = 0x00400000
+
+	global WS_OVERLAPPEDWINDOW : DWORD <comptime> = WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|WS_MINIMIZEBOX|WS_MAXIMIZEBOX
+	global WS_POPUPWINDOW : DWORD    <comptime> = WS_POPUP|WS_BORDER|WS_SYSMENU
+
+	global WS_CHILD : DWORD <comptime> = 0x40000000
+	global WS_EX_LEFT : DWORD <comptime> = 0x00000000
+	global WS_EX_LTRREADING : DWORD <comptime> = 0x00000000
+	global WS_EX_RIGHTSCROLLBAR : DWORD <comptime> = 0x00000000
+	global WS_EX_WINDOWEDGE : DWORD <comptime> = 0x00000100
+	global WS_EX_CONTROLPARENT : DWORD <comptime> = 0x00010000
+	global WS_EX_APPWINDOW : DWORD  <comptime> = 0x00040000
+	global WS_EX_TOOLWINDOW : DWORD  <comptime> = 128
+	global WS_EX_TOPMOST : DWORD  <comptime> = 8
+	global WS_EX_CLIENTEDGE : DWORD  <comptime> = 0x00000200
+	global WS_EX_OVERLAPPEDWINDOW : DWORD  <comptime> = 0x00000300
+	global WS_EX_DLGMODALFRAME : DWORD  <comptime> = 0x00000001
+
+	local fixedSingleExStyle: DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
+	local fixedSingleStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+	local fixed3DExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CLIENTEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW|WS_EX_OVERLAPPEDWINDOW
+	local fixed3DStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+	local fixedDialogExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_DLGMODALFRAME|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
+	local fixedDialogStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+	local normalWinExStyle: DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
+	local normalWinStyle : DWORD = WS_OVERLAPPEDWINDOW|WS_TABSTOP| WS_BORDER|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+	local fixedToolExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_TOOLWINDOW|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
+	local fixedToolStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+	local sizableToolExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_TOOLWINDOW|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
+	local sizableToolStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_THICKFRAME|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+--End of Window constants
+
+
+local Application = @record
+{
+	started : boolean,
+	mainLoopStarted: boolean,
+	hInstance : HINSTANCE,
+	className : string,
+	frmCount : integer,
+	screenWidth: integer,
+	screenHeight: integer,
+	mainWinHandle: HWND,
+
+}
+
+local app : Application
+
+
+local function windowProc(hw : HWND, msg: cuint, wp: WPARAM, lp: LPARAM): LRESULT <forwarddecl> end
+local function regWindow() <forwarddecl> end
+
+global FormStyle = @enum {None = 0, FixedSingle, Fixed3D, FixedDialog, FixedTool, Sizable, SizableTool, Hidden}
+global FormState = @enum {Normal = 0, Maximized, Minimized}
+global FormPosition = @enum {Center = 0, TopLeft, TopMid, TopRight, MidLeft, MidRight, BottomLeft, BottomMid, BottomRight, Manual}
+global FormDrawMode = @enum {Default = 0, FlatColor, Gradient}
+
+global Form = @record
+{
+	name : string,
+	text : string,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	handle : HWND,
+	maximizeBox: boolean,
+	minimizeBox: boolean,
+	topMost: boolean,
+	formState: FormState,
+	formPos: FormPosition,
+	hInstance : HINSTANCE,
+	backColor: Color,
+	font: Font,
+	style: FormStyle,
+	_count: uinteger,
+	_isCreated: boolean,
+	_winStyle: DWORD,
+	_exStyle: DWORD,
+	_drawMode: FormDrawMode,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_isMouseTracking: boolean,
+
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onClosing: EventHandler,
+	onClosed: EventHandler,
+
+	onMinimized: EventHandler,
+	onMaximized: EventHandler,
+	onRestored: EventHandler,
+
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+
+
+}
+
+
+
+function Form.new(title: string, width: integer, height: integer ) : Form --Constructor
+	local this : Form
+	this._count = this._count + 1
+	this.name = string.format("Form_%d", this._count)
+	this.text = title
+	this.width = width == 0 and 550 or width
+	this.height = height == 0 and 400 or height
+	this.xpos = 100
+	this.ypos = 100
+	this.style = FormStyle.Sizable
+	this.maximizeBox = true
+	this.minimizeBox = true
+	this.backColor = Color.new(0xF0EFEB)
+	return this
+end
+
+function regWindow()
+	app.className = "NForms_Window_Nelua"
+	app.hInstance = GetModuleHandleW(nilptr)
+	local wcEx : WNDCLASSEXW
+	local clr : COLORREF = (@COLORREF)(0x00EBEFF0)
+	wcEx.cbSize = #WNDCLASSEXW
+	wcEx.style = CS_HREDRAW|CS_VREDRAW
+	wcEx.lpfnWndProc = windowProc
+	wcEx.cbClsExtra = 0
+	wcEx.cbWndExtra = 256
+	wcEx.hInstance = app.hInstance
+	wcEx.hIcon = LoadIconW(nilptr, IDI_APPLICATION)
+	wcEx.hCursor = LoadCursorW(nilptr, IDC_ARROW)
+	wcEx.hbrBackground = (@HBRUSH)(CreateSolidBrush(clr))  --(@HBRUSH)(6)
+	wcEx.lpszMenuName = nilptr
+	wcEx.lpszClassName = wstrPtr(app.className)
+	local x = RegisterClassExW(&wcEx)
+end
+
+function Form:setStyles()
+	local mxFlag = false
+    switch self.style do
+    case FormStyle.None then
+        self._exStyle = 0x00050000
+        self._winStyle = 0x16010000
+    case FormStyle.FixedSingle then
+        self._exStyle = fixedSingleExStyle
+        self._winStyle = fixedSingleStyle
+        mxFlag = true
+    case FormStyle.Fixed3D then
+        self._exStyle = fixed3DExStyle
+        self._winStyle = fixed3DExStyle
+        mxFlag = true
+    case FormStyle.FixedDialog then
+        self._exStyle = fixedDialogExStyle
+        self._winStyle = fixedDialogStyle
+        mxFlag = true
+    case FormStyle.FixedTool then
+        self._exStyle = fixedToolExStyle
+        self._winStyle = fixedToolStyle
+    case FormStyle.Sizable then
+        self._exStyle = normalWinExStyle
+        self._winStyle = normalWinExStyle|WS_OVERLAPPEDWINDOW
+        print("my style")
+    case FormStyle.SizableTool then
+        self._exStyle = sizableToolExStyle
+        self._winStyle = sizableToolStyle -- con.WS_OVERLAPPEDWINDOW
+        mxFlag = true
+    case FormStyle.Hidden then
+        self._exStyle = WS_EX_TOOLWINDOW
+        self._winStyle = WS_BORDER
+    end
+
+    if mxFlag then
+        if not self.maximizeBox then self._winStyle = self._winStyle ~ WS_MAXIMIZEBOX end
+        if not self.minimizeBox then self._winStyle = self._winStyle ~ WS_MINIMIZEBOX end
+    end
+
+    if self.topMost then self._exStyle = self._exStyle or WS_EX_TOPMOST end
+    if self.formState == FormState.Maximized then self._winStyle = self._winStyle|WS_MAXIMIZE end
+end
+
+function Form:setPos()
+	switch self.formPos do
+	case FormPosition.Center then
+		self.xpos = (app.screenWidth - self.width) / 2
+        self.ypos = (app.screenHeight - self.height) / 2
+	case FormPosition.TopMid then self.xpos = (app.screenWidth - self.width) / 2
+	case FormPosition.TopRight then self.xpos = app.screenWidth - self.width
+	case FormPosition.MidLeft then self.ypos = (app.screenHeight - self.height) / 2
+	case FormPosition.MidRight then
+		self.xpos = app.screenWidth - self.width
+        self.ypos = (app.screenHeight - self.height) / 2
+	case FormPosition.BottomLeft then self.ypos = app.screenHeight - self.height
+	case FormPosition.BottomMid then
+		self.xpos = (app.screenWidth - self.width) / 2
+        self.ypos = app.screenHeight - self.height
+	case FormPosition.BottomRight then
+		self.xpos = app.screenWidth - self.width
+        self.ypos = app.screenHeight - self.height
+    end
+end
+
+function Form:createHandle()
+--InitCommonControls()
+	if not app.started then
+		app.started = true
+		app.screenWidth = GetSystemMetrics(0)
+		app.screenHeight = GetSystemMetrics(1)
+		regWindow()
+	end
+	self.hInstance = app.hInstance
+	self.font = Font.new()
+	self:setStyles()
+	self:setPos()
+	self.handle = CreateWindowExW(self._exStyle,
+                                               wstrPtr(app.className),
+                                    wstrPtr(self.text),
+                                    self._winStyle, self.xpos, self.ypos, self.width, self.height,
+                                    nilptr, nilptr, app.hInstance, nilptr)
+	if self.handle ~= nilptr then
+		self._isCreated = true
+		SetWindowLongPtrW(self.handle, GWLP_USERDATA, (@LONG_PTR) (self))
+		self.font:setFontInternal(self.handle)
+	else
+		print("not cretaed handle")
+	end
+end
+
+local function mainLoop()
+	local ms : MSG
+	while GetMessageW(&ms, nilptr, 0, 0) ~= 0 do
+	  TranslateMessage(&ms)
+	  DispatchMessageW(&ms)
+	end
+end
+
+function Form:show()
+	ShowWindow(self.handle, SW_SHOW)
+	UpdateWindow(self.handle)
+	if not app.mainLoopStarted then
+		app.mainLoopStarted = true
+		app.mainWinHandle = self.handle
+		mainLoop()
+	end
+end
+
+function Form:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._drawMode = FormDrawMode.FlatColor
+	suddenRedraw(self)
+end
+
+
+
+function Form:setBKGInternal(wpm: WPARAM) : LRESULT
+	-- if self._drawMode ~= FormDrawMode.Default then
+	local hdc: HDC = (@HDC)(wpm)
+	local hbr : HBRUSH
+	local rct: RECT
+	GetClientRect(self.handle, &rct)
+	if self._drawMode == FormDrawMode.FlatColor then
+		hbr = CreateSolidBrush(self.backColor.ref)
+	-- elseif self._drawMode == FormDrawMode.Gradient then
+		-- hbr = create_gradient_brush(hdc, rct, self._gdraw.c1, self._gdraw.c2, self._gdraw.t2b)
+	end
+	FillRect(hdc, &rct, hbr)
+	DeleteObject(hbr)
+	return 1
+end
+
+local function trackMouse(hw: HWND)
+	local tme : TRACKMOUSEEVENT
+    tme.cbSize = #TRACKMOUSEEVENT
+    tme.dwFlags = TME_HOVER | TME_LEAVE
+    tme.dwHoverTime = HOVER_DEFAULT
+    tme.hwndTrack = hw
+    TrackMouseEvent(&tme)
+end
+
+function Form:wmMouseMoveHandler(msg: UINT, wp: WPARAM, lp: LPARAM)
+	if not self._isMouseTracking then
+		self._isMouseTracking = true
+		trackMouse(self.handle)
+		if self._isMouseEntered then
+			if self.onMouseEnter ~= nilptr then
+				local ea : EventArgs = {}
+				self.onMouseEnter(self, &ea)
+			end
+		end
+	end
+
+	if self.onMouseMove ~= nilptr then
+		local mea = MouseEventArgs.new(msg, wp, lp)
+		self.onMouseMove(self, &mea)
+	end
+end
+
+function Form:wmMouseLeaveHandler()
+	if self._isMouseTracking then
+		self._isMouseTracking = false
+		self._isMouseEntered = false
+	end
+
+	if self.onMouseLeave ~= nilptr then
+		local ea: EventArgs = {}
+		self.onMouseLeave(self, &ea)
+	end
+end
+
+function Form:wmSysCommandHandler(wp: WPARAM)
+	local sysMsg : UINT = (wp & 0xFFF0)
+	switch sysMsg do
+	case SC_MINIMIZE then
+		if self.onMinimized ~= nilptr then
+			local ea : EventArgs = {}
+			self.onMinimized(self, &ea)
+		end
+	case SC_MAXIMIZE then
+		if self.onMaximized ~= nilptr then
+			local ea : EventArgs = {}
+			self.onMaximized(self, &ea)
+		end
+	case SC_RESTORE then
+		if self.onRestored ~= nilptr then
+			local ea : EventArgs = {}
+			self.onRestored(self, &ea)
+		end
+	end
+end
+
+function Form:keyDownHandler(wpm: WPARAM)
+	if self.onKeyDown ~= nilptr then
+		local kea =KeyEventArgs.new(wpm)
+		self.onKeyDown(self, &kea)
+	end
+end
+
+function Form:keyUpHandler(wpm: WPARAM)
+	if self.onKeyUp ~= nilptr then
+		local kea =KeyEventArgs.new(wpm)
+		self.onKeyUp(self, &kea)
+	end
+end
+
+function Form:keyPressHandler(wpm: WPARAM)
+	if self.onKeyPress ~= nilptr then
+		local kea =KeyEventArgs.new(wpm)
+		self.onKeyPress(self, &kea)
+	end
+end
+
+
+
+
+
+
+
+
+
+function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
+	local this = (@*Form) (GetWindowLongPtrW(hw, GWLP_USERDATA))
+	switch msg do
+	case WM_DESTROY then
+		local ea : EventArgs = {}
+		if this.onClosed ~= nilptr then this.onClosed(this, &ea) end
+		if ea.cancelled then return 0 end
+		if app.mainWinHandle == this.handle then PostQuitMessage(0) end
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then this:wmMouseMoveHandler(msg, wpm, lpm)
+	case WM_MOUSELEAVE then this:wmMouseLeaveHandler()
+
+	case WM_SYSCOMMAND then this:wmSysCommandHandler(wpm)
+	case WM_KEYDOWN, WM_SYSKEYDOWN then this:keyDownHandler(wpm)
+	case WM_KEYUP, WM_SYSKEYUP then this:keyUpHandler(wpm)
+	case WM_CHAR then this:keyPressHandler(wpm)
+
+	case WM_NOTIFY then
+		local nmhdr = (@*NMHDR)(lpm)
+		return SendMessageW(nmhdr.hwndFrom, MM_NOTIFY_REFLECT, wpm, lpm)
+
+
+
+
+	case WM_SHOWWINDOW then
+		print(this.name)
+	case WM_ERASEBKGND then
+		if this._drawMode ~= FormDrawMode.Default then return this:setBKGInternal(wpm) end
+	end
+	return DefWindowProcW(hw, msg, wpm, lpm)
+end
