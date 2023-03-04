@@ -4,6 +4,10 @@ require "nforms.apifuncs"
 require "nforms.events"
 
 global subClassID : UINT_PTR = 1000 -- global subclass id.
+global GradColor = @record {c1: Color, c2: Color,} -- Users of this record - Button & Form
+
+
+
 
 
 
@@ -25,6 +29,9 @@ global function createControl(ctrl: auto)
 		ctrl.font:setFontInternal(ctrl.handle)
 	end
 end
+
+global function getXFromLPARAM(lpm: LPARAM) : integer return (@integer)(loWord(lpm)) end
+global function getYFromLPARAM(lpm: LPARAM) : integer return (@integer)(hiWord(lpm)) end
 
 
 --Set subclass for a control type.
