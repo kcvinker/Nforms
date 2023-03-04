@@ -1,0 +1,111 @@
+--events module - Created on 02-Mar-2023 09:47 AM
+
+
+
+global function loWord(x: auto): WORD <inline>
+    return (@WORD)(x & 0xffff)
+end
+
+global function hiWord(x: auto): WORD <inline>
+    return (@WORD)(x >> 16)
+end
+
+
+global MouseButtons = @enum
+{
+    None = 0,
+    Right = 2097152,
+    Middle = 4194304,
+    Left = 1048576,
+    XButton1 = 8388608,
+    XButton2 = 16777216,
+}
+
+
+global KeyState = @enum {Released = 0, Pressed,}
+global Keys = @enum
+{
+    Modifier = -65536, None = 0, LeftButton, RightButton, Cancel, MiddleButton, Xbutton1, Xbutton2,
+    BackSpace = 8, Tab, Clear = 12, Enter, Shift = 16, Ctrl, Alt, Pause, CapsLock, Escape = 27,
+    Space = 32, PageUp, PageDown, End, Home, LeftArrow, UpArrow, RightArrow, DownArrow,
+    Select, Print, Execute, PrintScreen, Insert, Del, Help, D0, D1, D2, D3, D4, D5, D6, D7, D8, D9,
+    A = 65, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
+    LeftWin, RightWin, Apps, Sleep = 95, Numpad0, Numpad1, Numpad2, Numpad3, Numpad4, Numpad5,
+    Numpad6, Numpad7, Numpad8, Numpad9, Multiply, Add, Seperator, Subtract, Decimal, Divide, F1, F2,
+    F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, F14, F15, F16, F17, F18, F19, F20, F21, F22, F23, F24,
+    NumLock = 144, Scroll, LeftShift = 160, RightShift, LeftCtrl, RightCtrl, LeftMenu, RightMenu,
+    BrowserBack, BrowserForward, BrowerRefresh, BrowserStop, BrowserSearch, BrowserFavorites, BrowserHome,
+    VolumeMute, VolumeDown, VolumeUp, MediaNextTrack, MediaPrevTrack, MediaStop, MediaPlayPause, LaunchMail,
+    SelectMedia, LaunchApp1, LaunchApp2, Colon = 186, OemPlus, OemComma, OemMinus, OemPeriod, OemQuestion,
+    OemTilde, OemOpenBracket = 219, OemPipe, OemCloseBracket, OemQuotes, Oem8, OemBackSlash = 226,
+    Process = 229, Packet = 231, Attn = 246, CrSel, ExSel, EraseEof, Play, Zoom, NoName, Pa1, OemClear,
+}
+
+
+
+global EventArgs = @record {handled: boolean, cancelled: boolean}
+global MouseEventArgs = @record
+{
+    handled: boolean,
+    button: MouseButtons,
+    shiftKey: KeyState,
+    ctrlKey: KeyState,
+    clicks: integer,
+    delta: integer,
+    x: integer,
+    y: integer,
+}
+
+global KeyEventArgs = @record {
+	altPressed : boolean,
+    ctrlPressed : boolean,
+    shiftPressed : boolean,
+    keyCode : Keys,
+    keyValue : integer,
+    suppressKeyPress : boolean,
+}
+
+
+global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
+global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
+global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
+
+
+
+function MouseEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM)
+    local fwKeys = (@WORD)(wpm & 0xffff)
+    local this: MouseEventArgs
+    this.delta = hiWord(wpm)
+    switch fwKeys do
+        case 5 then this.shiftKey = KeyState.Pressed
+        case 9 then this.ctrlKey = KeyState.Pressed
+        case 17 then this.button = MouseButtons.Middle
+        case 33 then this.button = MouseButtons.XButton1
+    end
+
+    switch msg do
+        case WM_LBUTTONDOWN, WM_LBUTTONUP then this.button = MouseButtons.Left
+        case WM_RBUTTONDOWN, WM_RBUTTONUP then this.button = MouseButtons.Right
+    end
+
+    this.x = (@integer)(loWord((@DWORD)(lpm)))
+    this.y = (@integer)(hiWord((@DWORD)(lpm)))
+
+    return this
+end
+
+function KeyEventArgs.new(wp: WPARAM): KeyEventArgs
+    local this: KeyEventArgs
+    this.keyCode = (@Keys)(wp)
+    this.keyValue = (@integer)(wp)
+    switch this.keyCode do
+        case Keys.Shift : this.shiftPressed = true
+        case Keys.Ctrl : this.ctrlPressed = true
+        case Keys.Alt : this.altPressed = true
+    end
+    return this
+end
+
+
+
+
