@@ -1,0 +1,123 @@
+--color module - Created on 28-Feb-2023 08:43 AM
+require "math"
+
+global function getRGB(clr: uinteger): (uinteger, uinteger, uinteger) <forwarddecl> end
+global function makeCOLORREF(red: uinteger, green: uinteger, blue: uinteger): COLORREF <inline>
+	return (@COLORREF)((blue << 16) | (green << 8) | red)
+end
+
+global Color = @record {red: uinteger, green: uinteger, blue: uinteger, ref: COLORREF, value: uinteger, }
+
+
+local function clip(value: auto): auto
+	return math.clamp(value, 0, 255)
+end
+
+function Color.new(clr: uinteger): Color
+	local this : Color
+	this.value = clr
+	this.red = clr >> 16
+	this.green = (clr & 0x00ff00) >> 8
+	this.blue = clr & 0x0000ff
+	this.ref = (@COLORREF)((this.blue << 16) | (this.green << 8) | this.red)
+	return this
+end
+function Color.fromRGB(r: uinteger, g: uinteger, b: uinteger): Color
+	local this: Color
+	this.value = (r << 16) | (g << 8) | b
+	this.ref = (@COLORREF)((b << 16) | (g << 8) | r)
+	this.red = r
+	this.green = g
+	this.blue = b
+	return this
+end
+
+
+
+function Color:isDark(): boolean
+	local sum = (self.red * 0.2126) + (self.green * 0.7152) + (self.blue * 0.0722)
+	return sum < 40
+end
+
+function Color:changeColor(adj: number): Color
+	local r = clip((@uinteger)(self.red * adj))
+	local g = clip((@uinteger)(self.green * adj))
+	local b = clip((@uinteger)(self.blue * adj))
+	local rc: Color = Color.fromRGB(r, g, b)
+	return rc
+end
+
+
+
+
+
+
+
+
+
+
+function Color:getHotColor(adj: number): Color
+	local r = clip((@uinteger)(self.red * adj))
+	local g = clip((@uinteger)(self.green * adj))
+	local b = clip((@uinteger)(self.blue * adj))
+	local this: Color = Color.fromRGB(r, g, b)
+
+	return this
+end
+
+function Color:getHotColor2(adj: uinteger): Color
+	local r = clip(self.red + adj)
+	local g = clip(self.green + adj)
+	local b = clip(self.blue + adj)
+	local this: Color = Color.fromRGB(r, g, b)
+
+	return this
+end
+
+
+
+function getRGB(clr: uinteger): (uinteger, uinteger, uinteger)
+	local red = clr >> 16
+	local green = (clr & 0x00ff00) >> 8
+	local blue = clr & 0x0000ff
+
+	-- local st = string.format("Color: %X, red: %d, green: %d, blue: %d", clr, red, green, blue)
+	-- print(st)
+
+	return red, green, blue
+
+end
+
+global function createGradientBrush(hdc: HDC, rct: RECT, c1: Color, c2: Color, t2b: boolean): HBRUSH
+	local tBrush : HBRUSH
+	local memHdc : HDC = CreateCompatibleDC(hdc)
+	local hbmp : HBITMAP = CreateCompatibleBitmap(hdc, rct.right, rct.bottom)
+	local loopEnd : uinteger = t2b and rct.bottom or rct.right
+
+	SelectObject(memHdc, hbmp)
+
+	for i = 0, < loopEnd do
+		local tRct : RECT
+		local r : uinteger
+		local g: uinteger
+		local b : uinteger
+
+		r = c1.red + (@uinteger)((i * (c2.red - c1.red) / loopEnd))
+        g = c1.green + (@uinteger)((i * (c2.green - c1.green) / loopEnd))
+        b = c1.blue + (@uinteger)((i * (c2.blue - c1.blue) / loopEnd))
+		tBrush = CreateSolidBrush(makeCOLORREF(r, g, b))
+
+		tRct.left = t2b and 0 or i
+		tRct.top = t2b and i or 0
+		tRct.right = t2b and rct.right or i + 1
+		tRct.bottom = t2b and i + 1  or loopEnd
+
+		FillRect(memHdc, &tRct, tBrush)
+		DeleteObject(tBrush)
+	end
+	local gradientBrush : HBRUSH = CreatePatternBrush(hbmp)
+	DeleteDC(memHdc)
+	DeleteObject(tBrush)
+	DeleteObject(hbmp)
+	return gradientBrush
+end
