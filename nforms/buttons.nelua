@@ -66,6 +66,7 @@ global Button = @record
 
 
 	_isCreated: boolean,
+	_isTextable: boolean,
 	_style: DWORD,
 	_exStyle: DWORD,
 	_lbDown: boolean,
@@ -74,6 +75,7 @@ global Button = @record
 	_drawFlag: uinteger,
 	_fdraw: FlatDraw,
 	_gdraw: GradDraw,
+
 
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -91,7 +93,7 @@ global Button = @record
 function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Button
 	local this : Button
 	this.name = "Button_1"
-	this.className = wstrPtr("Button")
+	this.className = toUTF16("Button")
 	this.text = txt == "" and this.name or txt
 	this.width = w == 0 and 120 or w
 	this.height = h == 0 and 35 or h
@@ -101,6 +103,7 @@ function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer
 	this.parent = frm
 	this._style = WS_CHILD | WS_TABSTOP | WS_VISIBLE | BS_NOTIFY
 	this._exStyle = 0
+	this._isTextable = true
 
 	return this
 end
@@ -147,13 +150,18 @@ function Button:createHandle()
 	createControl(self)
 	-- self.handle = CreateWindowExW(b_ex_style,
     --                             self.className,
-    --                             wstrPtr(self.text),
+    --                             toUTF16(self.text),
     --                             b_style, self.xpos, self.ypos, self.width, self.height,
     --                             self.parent.handle, nilptr, self.parent.hInstance, nilptr)
 	if self._isCreated then
 		setSubClass(self.handle, (pointer)(self), btnWndProc)
 
 	end
+end
+
+function Button:setText(txt: string)
+	self.text = txt
+	if self._isCreated then	setControlText(self.handle, txt) end
 end
 
 -- function Button.createHandles(... : varargs)
@@ -192,7 +200,7 @@ end
 local function setBtnForColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESULT
 	SetTextColor(nmcd.hdc, this.foreColor.ref)
 	SetBkMode(nmcd.hdc, 1)
-	DrawTextW(nmcd.hdc, wstrPtr(this.text), -1, &nmcd.rc, b_txt_flag)
+	DrawTextW(nmcd.hdc, toUTF16(this.text), -1, &nmcd.rc, b_txt_flag)
 	return CDRF_NOTIFYPOSTPAINT
 end
 
