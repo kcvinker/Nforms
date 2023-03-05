@@ -1,4 +1,24 @@
 
+-- button module - Created on 27-Feb-2023
+--[[
+	For properties & Events, see the declaration of Button record.
+	Private fields are starting with underscore.
+
+	Important functions of Button record
+	---------------------------------------
+	Button.new - Constructor
+	Button:createHandle() - Create handle of Button
+	Button:setForeColor() - Set button text color
+	Button:setBackColor() - Set back ground color
+	Button:setGradientColor() - Set gradient back ground
+
+
+
+
+]]
+
+
+
 ##[[
 cinclude "<windows.h>"
 --cinclude "<commctrl.h>"
@@ -67,7 +87,7 @@ global Button = @record
 	onMouseLeave: EventHandler,
 }
 
-
+-- Public function
 function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Button
 	local this : Button
 	this.name = "Button_1"
@@ -121,7 +141,7 @@ function GradDraw:destroy()
 end
 
 
-
+-- Public function
 function Button:createHandle()
 
 	createControl(self)
@@ -147,12 +167,14 @@ function Button:destroy()
 	end
 end
 
+-- Public function
 function Button:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
 	invalidateNow(self)
 end
 
+-- Public function
 function Button:setBackColor(clr: uinteger)
 	self.backColor = Color.new(clr)
 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
@@ -160,6 +182,7 @@ function Button:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+-- Public function
 function Button:setGradientColor(clr1: uinteger, clr2: uinteger)
 	self._gdraw:init(clr1, clr2)
 	if (self._drawFlag & 4) ~= 4 then self._drawFlag = self._drawFlag + 4 end
