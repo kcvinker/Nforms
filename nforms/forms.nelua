@@ -1,5 +1,22 @@
 --forms module - Created on 27-Feb-2023
 
+--[[
+	In this module - Form record and it's functionalities.
+
+	These are the important functions in Form record
+	-------------------------------------------------
+	Form.new()  - Constructor
+	Form:createHandle() - Creating the window handle.
+	Form:show() - Display the form and entering to the main loop if it's the first form.
+	Form:setBackColor() - Set the back ground color
+	Form:setGradientBackColor - Set gradient back gound color
+	Form:hide() - Hide the form
+
+	For properties & Events - Look for the Form record declaration.
+	Private fields are starting with an underscore.
+	--------------------------------------------------
+]]
+
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.color"
@@ -27,6 +44,9 @@ require "nforms.common"
 	local TME_HOVER : DWORD <comptime> = 0x00000001
 	local TME_LEAVE : DWORD <comptime> = 0x00000002
 	local HOVER_DEFAULT : DWORD <comptime> = 0xFFFFFFFF
+
+	local SW_SHOW = 5
+	local SW_HIDE = 0
 
 	-- Window Styles Constants
 	global WS_OVERLAPPED : DWORD <comptime> = 0x00000000
@@ -305,6 +325,8 @@ function Form:show()
 	end
 end
 
+function Form:hide() ShowWindow(self.handle, SW_HIDE) end
+
 function Form:setBackColor(clr: uinteger)
 	self.backColor = Color.new(clr)
 	self._drawMode = FormDrawMode.FlatColor
@@ -498,9 +520,6 @@ end
 		return false
 	end
 -- End
-
-
-
 
 
 function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
