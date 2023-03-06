@@ -159,6 +159,21 @@ function TextBox:getText(txt: string): string
 	end
 end
 
+function TextBox:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+-- Public function
+function TextBox:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+
 
 
 function TextBox:destroy()
@@ -167,20 +182,6 @@ function TextBox:destroy()
 
 end
 
--- -- Public function
--- function TextBox:setForeColor(clr: uinteger)
--- 	self.foreColor = Color.new(clr)
--- 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
--- 	invalidateNow(self)
--- end
-
--- -- Public function
--- function TextBox:setBackColor(clr: uinteger)
--- 	self.backColor = Color.new(clr)
--- 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
--- 	self._fdraw:init(self.backColor)
--- 	invalidateNow(self)
--- end
 
 -- -- Public function
 -- function TextBox:setGradientColor(clr1: uinteger, clr2: uinteger)
@@ -279,6 +280,14 @@ function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+
+	case MM_EDIT_COLOR then
+		if this._drawFlag > 0 then
+			local hdc = (HDC)(wpm)
+			if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+			if (this._drawFlag & 2) == 2 then SetBkColor(hdc, this.backColor.ref) end
+		end
+		return (LRESULT)(this._bkBrush)
 
 	-- case MM_NOTIFY_REFLECT then	return btnWmNotifyHandler(this, lpm)
 
