@@ -1,0 +1,223 @@
+
+
+
+-- RadioButton module - Created on 10-Mar-2023 07:49 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local BS_AUTORADIOBUTTON <comptime> = 0x00000009
+	local BCM_GETIDEALSIZE <comptime> = 0x1601
+	local BS_RIGHTBUTTON <comptime> = 0x00000200
+	local BM_SETCHECK <comptime> = 0x00F1
+	-- local ES_WANTRETURN <comptime> = 4096
+	-- local ES_NOHIDESEL <comptime> = 256
+	-- local ES_READONLY <comptime> = 0x800
+	-- local ES_LOWERCASE <comptime> = 16
+	-- local ES_UPPERCASE <comptime> = 8
+
+	-- local ES_NUMBER <comptime> = 0x2000
+	-- local ES_PASSWORD <comptime> = 32
+	-- local ES_CENTER <comptime> = 1
+	-- local ES_RIGHT <comptime> = 2
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+-- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
+-- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local rbNumber = 1
+local function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global RadioButton = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	autoSize: boolean,
+    checked: boolean,
+    checkOnClick: boolean,
+	rightAlign: boolean,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: UINT,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function RadioButton.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : RadioButton
+	local this : RadioButton
+	this.name = string.format("RadioButton_%d", rbNumber)
+	this.className = toUTF16("Button")
+	this.text = txt == "" and this.name or txt
+	this.width = w
+	this.height = h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON
+	this._exStyle = WS_EX_LTRREADING | WS_EX_LEFT
+    this._dwTxtFlag = DT_SINGLELINE | DT_VCENTER
+	this._isTextable = false
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+    this.autoSize = true
+
+    rbNumber = rbNumber + 1
+	return this
+end
+
+function RadioButton:setCbStyle()
+	if self.rightAlign then
+		self._style = self._style | BS_RIGHTBUTTON
+		self._dwTxtFlag = self._dwTxtFlag | DT_RIGHT
+    end
+    if self.checkOnClick then self._style = self._style ^ BS_AUTORADIOBUTTON end
+    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+end
+
+
+function RadioButton:setSize()
+    local ss : SIZE
+    SendMessageW(self.handle, BCM_GETIDEALSIZE, 0, (LPARAM)(&ss));
+    self.width = ss.cx;
+    self.height = ss.cy;
+    SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, self.width, self.height, SWP_NOMOVE)
+end
+
+-- Public function
+function RadioButton:createHandle()
+	self:setCbStyle()
+	createControl(self)
+	if self._isCreated then
+        self:setSize()
+		setSubClass(self.handle, (pointer)(self), rbWndProc)
+        if self.checked then SendMessageW(self.handle, BM_SETCHECK, 0x0001, 0) end
+	end
+end
+
+function RadioButton:setText(txt: string)
+	self.text = txt
+	if self._isCreated then	setControlText(self.handle, txt) end
+end
+
+function RadioButton:getText(txt: string): string
+	if self._isCreated then
+		local wstr = getControlText(self.handle)
+		self.text = toUTF8(wstr)
+		return self.text
+	else
+		return self.text
+	end
+end
+
+function RadioButton:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function RadioButton:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+function RadioButton:destroy()
+	print("RadioButton destroyed")
+	DeleteObject(self._bkBrush)
+end
+
+function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*RadioButton)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, rbWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+    case MM_CTL_COMMAND then
+        if hiWord(wpm) == 0 then
+            this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
+            if this.onCheckedChanged ~= nilptr then
+                local ea = EventArgs {}
+                this.onCheckedChanged(this, &ea)
+            end
+        end
+
+	case MM_LABEL_COLOR then
+        local hdc = (HDC)(wpm)
+        SetBkColor(hdc, this.backColor.ref)
+		return (LRESULT)(this._bkBrush)
+
+    case MM_NOTIFY_REFLECT then
+        local nmc = (@LPNMCUSTOMDRAW)(lpm)
+        switch nmc.dwDrawStage do
+            case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
+            case CDDS_PREPAINT then
+                local rct = nmc.rc
+                if not this.rightAlign then  -- Adjusing rect. Otherwise, text will be drawn upon the check area
+                    rct.left = rct.left + 18
+                else
+                    rct.right = rct.right - 18
+                end
+                SetTextColor(nmc.hdc, this.foreColor.ref)
+                DrawTextW(nmc.hdc, toUTF16(this.text), -1, &rct, this._dwTxtFlag)
+                return CDRF_SKIPDEFAULT
+        end
+
+
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
