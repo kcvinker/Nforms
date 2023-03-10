@@ -1,8 +1,6 @@
 -- Textbox module - Created on 05-Mar-2023 07:18 AM
 
 
-
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
@@ -57,6 +55,7 @@ global TextBox = @record
 	hideSelection: boolean,
 	readOnly: boolean,
 
+	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
 	_style: DWORD,
@@ -67,7 +66,7 @@ global TextBox = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
 
-
+	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
 	onClick: EventHandler,
@@ -82,7 +81,6 @@ global TextBox = @record
 	onKeyDown: KeyEventHandler,
 	onKeyUp: KeyEventHandler,
 	onKeyPress: KeyEventHandler,
-
 }
 
 -- Public function
@@ -130,9 +128,6 @@ function TextBox:setTbStyles()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
-
-
-
 -- Public function
 function TextBox:createHandle()
 	self:setTbStyles()
@@ -173,96 +168,10 @@ function TextBox:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
-
-
-
 function TextBox:destroy()
 	print("TextBox destroyed")
 	DeleteObject(self._bkBrush)
-
 end
-
-
--- -- Public function
--- function TextBox:setGradientColor(clr1: uinteger, clr2: uinteger)
--- 	self._gdraw:init(clr1, clr2)
--- 	if (self._drawFlag & 4) ~= 4 then self._drawFlag = self._drawFlag + 4 end
--- 	invalidateNow(self)
--- end
-
--- local function setBtnForColorInternal(this: *TextBox, nmcd: *NMCUSTOMDRAW): LRESULT
--- 	SetTextColor(nmcd.hdc, this.foreColor.ref)
--- 	SetBkMode(nmcd.hdc, 1)
--- 	DrawTextW(nmcd.hdc, toUTF16(this.text), -1, &nmcd.rc, b_txt_flag)
--- 	return CDRF_NOTIFYPOSTPAINT
--- end
-
--- local function paintFlatTextBox(hdc: HDC, rc: RECT, hbr: HBRUSH, pen: HPEN)
--- 	SelectObject(hdc, hbr)
--- 	SelectObject(hdc, pen)
--- 	RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, btn_round_factor, btn_round_factor)
--- 	FillPath(hdc)
--- end
-
--- local function paintGradientTextBox(hdc: HDC, rc: RECT, gc: GradColor, pen: HPEN)
--- 	local gBrush: HBRUSH = createGradientBrush(hdc, rc, gc.c1, gc.c2, true)
--- 	defer DeleteObject(gBrush) end
-
--- 	SelectObject(hdc, pen)
--- 	SelectObject(hdc, gBrush)
--- 	RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, btn_round_factor, btn_round_factor)
--- 	FillPath(hdc)
--- end
-
-
--- local function setBtnBackColorInternal(this: *TextBox, nmcd: *NMCUSTOMDRAW): LRESULT
--- 	switch nmcd.dwDrawStage do
--- 	case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
--- 	case CDDS_PREPAINT then
--- 		if (nmcd.uItemState & mouse_clicked) == mouse_clicked then
--- 			paintFlatTextBox(nmcd.hdc, nmcd.rc, this._fdraw.defBrush, this._fdraw.hotPen)
--- 		elseif (nmcd.uItemState & mouse_over) == mouse_over then
--- 			paintFlatTextBox(nmcd.hdc, nmcd.rc, this._fdraw.hotBrush, this._fdraw.hotPen)
--- 		else
--- 			paintFlatTextBox(nmcd.hdc, nmcd.rc, this._fdraw.defBrush, this._fdraw.defPen)
--- 		end
--- 		return CDRF_DODEFAULT
--- 	end
--- 	return CDRF_DODEFAULT
--- end
-
--- local function setBtnGradientColorInternal(this: *TextBox, nmcd: *NMCUSTOMDRAW): LRESULT
--- 	switch nmcd.dwDrawStage do
--- 	case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
--- 	case CDDS_PREPAINT then
--- 		if (nmcd.uItemState & mouse_clicked) == mouse_clicked then
--- 			paintGradientTextBox(nmcd.hdc, nmcd.rc, this._gdraw.defGC, this._gdraw.hotPen)
--- 		elseif (nmcd.uItemState & mouse_over) == mouse_over then
--- 			paintGradientTextBox(nmcd.hdc, nmcd.rc, this._gdraw.hotGC, this._gdraw.hotPen)
--- 		else
--- 			paintGradientTextBox(nmcd.hdc, nmcd.rc, this._gdraw.defGC, this._gdraw.defPen)
--- 		end
--- 		return CDRF_DODEFAULT
--- 	end
--- 	return CDRF_DODEFAULT
--- end
-
--- local function btnWmNotifyHandler(this: *TextBox, lp: LPARAM): LRESULT
--- 	local ret = CDRF_DODEFAULT
--- 	if this._drawFlag then
--- 		local nmcd = (@*NMCUSTOMDRAW)(lp)
--- 		switch this._drawFlag do
--- 			case 1 then return setBtnForColorInternal(this, nmcd)
--- 			case 2 then return setBtnBackColorInternal(this, nmcd)
--- 			case 3 then
--- 				setBtnBackColorInternal(this, nmcd)
--- 				return setBtnForColorInternal(this, nmcd)
--- 			case 4 then return setBtnGradientColorInternal(this, nmcd)
--- 			-- case 5 then
--- 		end
--- 	end
--- 	return ret
--- end
 
 function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 	local this = (@*TextBox)((pointer)(refData))
@@ -280,6 +189,9 @@ function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case WM_KEYDOWN then keyDownHandler(this, wpm)
+	case WM_KEYUP then keyUpHandler(this, wpm)
+	case WM_CHAR then keyPressHandler(this, wpm)
 
 	case MM_EDIT_COLOR then
 		if this._drawFlag > 0 then
@@ -288,11 +200,6 @@ function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 			if (this._drawFlag & 2) == 2 then SetBkColor(hdc, this.backColor.ref) end
 		end
 		return (LRESULT)(this._bkBrush)
-
-	-- case MM_NOTIFY_REFLECT then	return btnWmNotifyHandler(this, lpm)
-
-
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
