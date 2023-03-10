@@ -1,0 +1,207 @@
+
+-- Label module - Created on 10-Mar-2023 03:02 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local SWP_NOMOVE <comptime> = 0x0002
+	local SS_NOTIFY <comptime> = 0x0100
+	local SS_SUNKEN <comptime> = 0x1000
+	local HOLLOW_BRUSH <comptime> = 0
+	-- local ES_WANTRETURN <comptime> = 4096
+	-- local ES_NOHIDESEL <comptime> = 256
+	-- local ES_READONLY <comptime> = 0x800
+	-- local ES_LOWERCASE <comptime> = 16
+	-- local ES_UPPERCASE <comptime> = 8
+
+	-- local ES_NUMBER <comptime> = 0x2000
+	-- local ES_PASSWORD <comptime> = 32
+	-- local ES_CENTER <comptime> = 1
+	-- local ES_RIGHT <comptime> = 2
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+local lbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
+local lbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local lbNumber = 1
+local function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global LabelBorder = @enum {noBorder = 0, singleLine, sunkenBorder}
+
+global Label = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	alignment: TextAlign,
+	multiLine: boolean,
+	autoSize: boolean,
+	rightAlign: boolean,
+    border: LabelBorder,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: DWORD,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function Label.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Label
+	local this : Label
+	this.name = string.format("Label_%d", lbNumber)
+	this.className = toUTF16("Static")
+	this.text = txt == "" and this.name or txt
+	this.width = w
+	this.height = h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = lbStyle
+	this._exStyle = lbExStyle
+	this._isTextable = false
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+    this.autoSize = true
+    this.border = LabelBorder.noBorder
+    lbNumber = lbNumber + 1
+	return this
+end
+
+function Label:setlbBorder()
+	if self.border == LabelBorder.sunkenBorder then
+        self._style = self._style | SS_SUNKEN
+    elseif self.border == LabelBorder.singleLine then
+        self._style = self._style | WS_BORDER
+	end
+    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+end
+
+function Label:checkForAutoSize()
+    if self.multiLine or self.width ~= 0 or self.height ~= 0 then self.autoSize = false end
+    if not self.autoSize then
+        if self.width == 0 then self.width = 100 end
+        if self.height == 0 then self.height = 30 end
+    end
+end
+
+function Label:calculateAutoSize()
+    local hdc = GetDC(self.handle)
+    defer ReleaseDC(self.handle, hdc) end
+    local ss : SIZE
+    SelectObject(hdc, self.font.handle)
+    GetTextExtentPoint32W(hdc, toUTF16(self.text), string.len(self.text), &ss)
+
+    self.width = ss.cx + 2
+    self.height = ss.cy
+    SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, self.width, self.height, SWP_NOMOVE)
+end
+
+-- Public function
+function Label:createHandle()
+	self:setlbBorder()
+    self:checkForAutoSize()
+	createControl(self)
+	if self._isCreated then
+        if self.autoSize then self:calculateAutoSize() end
+		setSubClass(self.handle, (pointer)(self), lbWndProc)
+	end
+end
+
+function Label:setText(txt: string)
+	self.text = txt
+	if self._isCreated then	setControlText(self.handle, txt) end
+end
+
+function Label:getText(txt: string): string
+	if self._isCreated then
+		local wstr = getControlText(self.handle)
+		self.text = toUTF8(wstr)
+		return self.text
+	else
+		return self.text
+	end
+end
+
+function Label:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function Label:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+function Label:destroy()
+	print("Label destroyed")
+	DeleteObject(self._bkBrush)
+end
+
+function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*Label)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, lbWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+	case MM_LABEL_COLOR then
+        local hdc = (HDC)(wpm)
+		if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+        SetBkColor(hdc, this.backColor.ref)
+		return (LRESULT)(this._bkBrush) --(GetStockObject(HOLLOW_BRUSH))
+	end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
