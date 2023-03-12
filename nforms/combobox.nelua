@@ -1,11 +1,11 @@
 
 -- ComboBox module - Created on 10-Mar-2023 08:06 PM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
 require "nforms.common"
+-- require 'hashmap'
 
 --Constants
 	local CBS_DROPDOWNLIST <comptime> = 0x0003
@@ -13,20 +13,20 @@ require "nforms.common"
 	local CB_GETCOMBOBOXINFO <comptime> = 0x0164
 	local CB_ADDSTRING <comptime> = 0x0143
 	local CB_SETCURSEL <comptime> = 0x014E
-	-- local ES_NOHIDESEL <comptime> = 256
-	-- local ES_READONLY <comptime> = 0x800
-	-- local ES_LOWERCASE <comptime> = 16
-	-- local ES_UPPERCASE <comptime> = 8
 
-	-- local ES_NUMBER <comptime> = 0x2000
-	-- local ES_PASSWORD <comptime> = 32
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+	local CBN_SELCHANGE <comptime> = 0x01
+	local CBN_SETFOCUS <comptime> = 0x03
+	local CBN_KILLFOCUS <comptime> = 0x04
+	local CBN_EDITCHANGE <comptime> = 0x05
+	local CBN_EDITUPDATE <comptime> = 0x06
+	local CBN_DROPDOWN <comptime> = 0x07
+	local CBN_CLOSEUP <comptime> = 0x08
+	local CBN_SELENDOK <comptime> = 0x09
+	local CBN_SELENDCANCEL <comptime> = 0x0A
+
 --End
 
--- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
--- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+
 local cmbNumber = 1
 local function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
@@ -46,10 +46,9 @@ global ComboBox = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-    items: span(string),
+    items: vector(string),
     selectedIndex: integer,
     enableInput: boolean,
-
 
 	--Private fields
 	_isCreated: boolean,
@@ -77,8 +76,18 @@ global ComboBox = @record
 	onMouseMove: MouseEventHandler,
 	onMouseLeave: EventHandler,
 	onCheckedChanged: EventHandler,
-	-- onKeyUp: KeyEventHandler,
-	-- onKeyPress: KeyEventHandler,
+	onSelectionChanged: EventHandler,
+	onSelectionCommitted: EventHandler,
+	onSelectionCancelled: EventHandler,
+	onGotFocus: EventHandler,
+	onLostFocus: EventHandler,
+	onTextChanged: EventHandler,
+	onTextUpdated: EventHandler,
+	onListOpened: EventHandler,
+	onListClosed: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
 }
 
 -- Public function
@@ -86,7 +95,7 @@ function ComboBox.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	local this : ComboBox
 	this.name = string.format("ComboBox_%d", cmbNumber)
 	this.className = toUTF16("ComboBox")
-	this.width = w == 0 and 120 or 1
+	this.width = w == 0 and 140 or 1
 	this.height = h == 0 and 30 or h
 	this.xpos = x == 0 and 20 or x
 	this.ypos = y == 0 and 20 or y
@@ -94,11 +103,10 @@ function ComboBox.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this.parent = frm
 	this.cid = frm._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE
-	this._exStyle = WS_EX_CLIENTEDGE
+	this._exStyle = 0 -- WS_EX_CLIENTEDGE
 	this.backColor = frm.backColor
 	this.foreColor = colorBlack
-
-
+	this.selectedIndex = -1
     cmbNumber = cmbNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
@@ -106,15 +114,12 @@ end
 
 function ComboBox:setCbStyle()
 	if self.enableInput then
-		self._style = self._style | CBS_DROPDOWNLIST
+		self._style = self._style |CBS_DROPDOWN
 	else
-		self._style = self._style | CBS_DROPDOWN
+		self._style = self._style |CBS_DROPDOWNLIST
     end
 	if self._bkBrush == nilptr then self._bkBrush = CreateSolidBrush(self.backColor.ref) end
 end
-
-
-
 
 function ComboBox:afterCreationJobs()
 	self._oldHwnd = self.handle
@@ -123,16 +128,15 @@ function ComboBox:afterCreationJobs()
 	local cmbInfo: COMBOBOXINFO
 	cmbInfo.cbSize = #COMBOBOXINFO
 	SendMessageW(self.handle, CB_GETCOMBOBOXINFO, 0, (LPARAM)(&cmbInfo))
-	-- self.parent.cmb_dict[cmbInfo.hwndList] = self.handle -- Put the handle in parent's dic
+	self.parent.comboMap[cmbInfo.hwndList] = self.handle -- Put the handle in parent's dic
 	SetWindowSubclass(cmbInfo.hwndItem, &cmbEditWndProc, subClassID, (@DWORD_PTR)(self))
 	subClassID = subClassID + 1
 
-	if #self.items > 0 then
-		for i, item in ipairs(self.items) do
+	if self.items.size > 0 then
+		for _, item in ipairs(self.items) do
 			SendMessageW(self.handle, CB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
 		end
 	end
-
 end
 
 -- Public function
@@ -148,20 +152,23 @@ function ComboBox:createHandle()
 	end
 end
 
--- function ComboBox:setText(txt: string)
--- 	self.text = txt
--- 	if self._isCreated then	setControlText(self.handle, txt) end
--- end
+function ComboBox:addItem(item: auto)
+	self.items:push(tostring(item))
+	if self._isCreated then
+		SendMessageW(self.handle, CB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
+	end
+end
 
--- function ComboBox:getText(txt: string): string
--- 	if self._isCreated then
--- 		local wstr = getControlText(self.handle)
--- 		self.text = toUTF8(wstr)
--- 		return self.text
--- 	else
--- 		return self.text
--- 	end
--- end
+function ComboBox:addItems(...: varargs)
+	## for i=1,select('#', ...) do
+		local sitem = tostring(#[select(i, ...)]#)
+		self.items:push(sitem)
+		if self._isCreated then
+			SendMessageW(self.handle, CB_ADDSTRING, 0, (@LPARAM)(toUTF16(sitem)))
+		end
+	## end
+end
+
 
 function ComboBox:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
@@ -175,6 +182,43 @@ function ComboBox:setBackColor(clr: uinteger)
 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
 	invalidateNow(self)
 end
+
+local function getMousePoints(): POINT
+	local dwValue = GetMessagePos()
+	local p : POINT
+	p.x = (@LONG)(loWord(dwValue))
+	p.y = (@LONG)(hiWord(dwValue))
+	return p
+end
+
+function ComboBox:isInComboRect(hwnd: HWND): boolean
+	local rc : RECT
+	GetWindowRect(hwnd, &rc)
+	local pt = getMousePoints()
+    local bRes = PtInRect(&rc, pt)
+	return bRes
+end
+
+function ComboBox:mouseLeaveHandler(hwnd: HWND) : LRESULT
+	if self.enableInput then
+		if self:isInComboRect(hwnd) then
+			return 1
+		else
+			if self.onMouseLeave ~= nilptr then
+				local ea : EventArgs = {}
+				self.onMouseLeave(self, &ea)
+			end
+		end
+	else
+		if self.onMouseLeave ~= nilptr then
+			local ea : EventArgs = {}
+			self.onMouseLeave(self, &ea)
+		end
+	end
+	return 0
+end
+
+
 
 function ComboBox:destroy()
 	print("ComboBox destroyed")
@@ -196,44 +240,69 @@ function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
-	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case WM_MOUSELEAVE then return this:mouseLeaveHandler(hw)
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
 
-    -- case MM_CTL_COMMAND then
-    --     if hiWord(wpm) == 0 then
-    --         this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
-    --         if this.onCheckedChanged ~= nilptr then
-    --             local ea = EventArgs {}
-    --             this.onCheckedChanged(this, &ea)
-    --         end
-    --     end
+	case MM_LIST_COLOR then
+		if this._drawFlag > 0 then
+			local hdc = (HDC)(wpm)
+			if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+			if (this._drawFlag & 2) == 2 then SetBkColor(hdc, this.backColor.ref) end
+		end
+		return (LRESULT)(this._bkBrush)
 
-	-- case MM_LABEL_COLOR then
-    --     local hdc = (HDC)(wpm)
-    --     SetBkColor(hdc, this.backColor.ref)
-	-- 	return (LRESULT)(this._bkBrush)
-
-    -- case MM_NOTIFY_REFLECT then
-    --     local nmc = (@LPNMCUSTOMDRAW)(lpm)
-    --     switch nmc.dwDrawStage do
-    --         case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
-    --         case CDDS_PREPAINT then
-    --             local rct = nmc.rc
-    --             if not this.rightAlign then  -- Adjusing rect. Otherwise, text will be drawn upon the check area
-    --                 rct.left = rct.left + 18
-    --             else
-    --                 rct.right = rct.right - 18
-    --             end
-    --             SetTextColor(nmc.hdc, this.foreColor.ref)
-    --             DrawTextW(nmc.hdc, toUTF16(this.text), -1, &rct, this._dwTxtFlag)
-    --             return CDRF_SKIPDEFAULT
-    --     end
-
-
+	case MM_CTL_COMMAND then
+        local nCode = hiWord(wpm)
+		switch nCode do
+			case CBN_SELCHANGE then
+				if this.onSelectionChanged then
+					local ea: EventArgs = {}
+					this.onSelectionChanged(this, &ea)
+				end
+			case CBN_SETFOCUS then
+				if this.onGotFocus then
+					local ea: EventArgs = {}
+					this.onGotFocus(this, &ea)
+				end
+			case CBN_KILLFOCUS then
+				if this.onLostFocus then
+					local ea: EventArgs = {}
+					this.onLostFocus(this, &ea)
+				end
+			case CBN_EDITCHANGE then
+				if this.onTextChanged then
+					local ea: EventArgs = {}
+					this.onTextChanged(this, &ea)
+				end
+			case CBN_EDITUPDATE then
+				if this.onTextUpdated then
+					local ea: EventArgs = {}
+					this.onTextUpdated(this, &ea)
+				end
+			case CBN_DROPDOWN then
+				if this.onListOpened then
+					local ea: EventArgs = {}
+					this.onListOpened(this, &ea)
+				end
+			case CBN_CLOSEUP then
+				if this.onListClosed then
+					local ea: EventArgs = {}
+					this.onListClosed(this, &ea)
+				end
+			case CBN_SELENDOK then
+				if this.onSelectionCommitted then
+					local ea: EventArgs = {}
+					this.onSelectionCommitted(this, &ea)
+				end
+			case CBN_SELENDCANCEL then
+				if this.onSelectionCancelled then
+					local ea: EventArgs = {}
+					this.onSelectionCancelled(this, &ea)
+				end
+		end
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
 
@@ -244,6 +313,27 @@ function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UIN
 	case WM_DESTROY then
 	    RemoveWindowSubclass(hw, cmbEditWndProc, scID)
 
+	case WM_KEYDOWN then keyDownHandler(this, wpm)
+	case WM_KEYUP then keyUpHandler(this, wpm)
+	case WM_CHAR then keyPressHandler(this, wpm)
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+
+	case MM_EDIT_COLOR then
+		if this._drawFlag > 0 then
+			local hdc = (@HDC)(wpm)
+			SetBkMode(hdc, 1)
+			if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+			if (this._drawFlag & 2) == 2 then SetBkColor(hdc, this.backColor.ref) end
+		end
+		return (@LRESULT)(this._bkBrush)
 	end
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
