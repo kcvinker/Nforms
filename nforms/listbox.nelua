@@ -1,0 +1,225 @@
+-- ListBox module - Created on 11-Mar-2023 02:36 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local LBS_NOTIFY <comptime> = 0x00000001
+	local LBS_HASSTRINGS <comptime> = 0x00000040
+	local LBS_SORT <comptime> = 0x00000002
+	local LBS_EXTENDEDSEL <comptime> = 0x00000800
+	local LBS_MULTIPLESEL <comptime> = 0x00000008
+	local LBS_MULTICOLUMN <comptime> = 0x00002000
+	local LBS_NOSEL <comptime> = 0x00000000
+	local LBS_WANTKEYBOARDINPUT <comptime> = 0x00000400
+	local WS_HSCROLL <comptime> = 0x00100000
+	local WS_VSCROLL <comptime> = 0x00200000
+	local LB_ADDSTRING <comptime> = 0x0180
+	-- local ES_CENTER <comptime> = 1
+	-- local ES_RIGHT <comptime> = 2
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+-- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
+-- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local lbxNumber = 1
+local function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global ListBox = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	hasSort: boolean,
+    noSelection: boolean,
+	multiColumn: boolean,
+	keyPreview: boolean,
+	useVScroll: boolean,
+	useHScroll: boolean,
+	multiSelection: boolean,
+    selectedIndex: integer,
+	selectedIndices: vector(integer),
+	items: vector(string),
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dummyIndex: integer,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function ListBox.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ListBox
+	local this : ListBox
+	this.name = string.format("ListBox_%d", lbxNumber)
+	this.className = toUTF16("ListBox")
+	this.width = w == 0 and 150 or w
+	this.height = h == 0 and 150 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = WS_VISIBLE | WS_CHILD | WS_BORDER  | LBS_NOTIFY | LBS_HASSTRINGS
+	this._exStyle = 0
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+
+    lbxNumber = lbxNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+function ListBox:setLbxStyle()
+	if self.hasSort then self._style = self._style | LBS_SORT end
+    if self.multiSelection then self._style = self._style | LBS_EXTENDEDSEL | LBS_MULTIPLESEL end
+    if self.multiColumn then self._style = self._style | LBS_MULTICOLUMN end
+    if self.noSelection then self._style = self._style | LBS_NOSEL end
+    if self.keyPreview then self._style = self._style | LBS_WANTKEYBOARDINPUT end
+    if self.useHScroll then self._style = self._style | WS_HSCROLL end
+    if self.useVScroll then self._style = self._style | WS_VSCROLL end
+    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+end
+
+
+function ListBox:fillItems()
+	if self.items.size > 0 then
+		for _, item in ipairs(self.items) do
+			SendMessageW(self.handle, LB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
+		end
+	end
+end
+
+-- Public function
+function ListBox:createHandle()
+	self:setLbxStyle()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), lbxWndProc)
+        self:fillItems()
+	end
+end
+
+function ListBox:addItem(item: auto)
+	self.items:push(tostring(item))
+	if self._isCreated then
+		SendMessageW(self.handle, LB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
+	end
+end
+
+function ListBox:addItems(...: varargs)
+	## for i=1,select('#', ...) do
+		local sitem = tostring(#[select(i, ...)]#)
+		self.items:push(sitem)
+		if self._isCreated then
+			SendMessageW(self.handle, LB_ADDSTRING, 0, (@LPARAM)(toUTF16(sitem)))
+		end
+	## end
+end
+
+function ListBox:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function ListBox:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+function ListBox:destroy()
+	print("ListBox destroyed")
+	DeleteObject(self._bkBrush)
+end
+
+function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*ListBox)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, lbxWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+    -- case MM_CTL_COMMAND then
+    --     this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
+    --     if this.onCheckedChanged ~= nilptr then
+    --         local ea = EventArgs {}
+    --         this.onCheckedChanged(this, &ea)
+    --     end
+
+	-- case MM_LABEL_COLOR then
+    --     local hdc = (HDC)(wpm)
+    --     SetBkColor(hdc, this.backColor.ref)
+	-- 	return (LRESULT)(this._bkBrush)
+
+    -- case MM_NOTIFY_REFLECT then
+    --     local nmc = (@LPNMCUSTOMDRAW)(lpm)
+    --     switch nmc.dwDrawStage do
+    --         case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
+    --         case CDDS_PREPAINT then
+    --             local rct = nmc.rc
+    --             if not this.rightAlign then  -- Adjusing rect. Otherwise, text will be drawn upon the check area
+    --                 rct.left = rct.left + 18
+    --             else
+    --                 rct.right = rct.right - 18
+    --             end
+    --             SetTextColor(nmc.hdc, this.foreColor.ref)
+    --             DrawTextW(nmc.hdc, toUTF16(this.text), -1, &rct, this._dwTxtFlag)
+    --             return CDRF_SKIPDEFAULT
+    --     end
+
+
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
