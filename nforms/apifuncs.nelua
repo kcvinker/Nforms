@@ -63,10 +63,18 @@ cinclude "<commctrl.h>"
 --End of Types
 
 global SW_SHOW : DWORD <comptime> = 5
+global RDW_INVALIDATE : UINT <comptime> = 1
+global RDW_INTERNALPAINT : UINT <comptime> = 2
+global RDW_UPDATENOW : UINT <comptime> = 256
 
 --Structs
-    global POINT = @record {x : LONG, y : LONG}
-    global MSG = @record {
+    global POINT : type <cimport,nodecl> = @record {
+        x : LONG,
+        y : LONG,
+    }
+    global LPPOINT = @*POINT
+
+    global MSG : type <cimport,nodecl> = @record {
         hwnd: HWND,
         message: UINT,
         wparam: WPARAM,
@@ -77,7 +85,7 @@ global SW_SHOW : DWORD <comptime> = 5
     }
     global LPMSG : type = @*MSG
 
-    global WNDCLASSEXW = @record {
+    global WNDCLASSEXW : type <cimport,nodecl> = @record {
         cbSize : UINT,
         style : DWORD,
         lpfnWndProc : WNDPROC,
@@ -93,23 +101,23 @@ global SW_SHOW : DWORD <comptime> = 5
     }
     global LPWNDCLASSEXW = @*WNDCLASSEXW
 
-    global RECT = @record { left: LONG, top: LONG, right: LONG, bottom: LONG }
+    global RECT : type <cimport,nodecl> = @record { left: LONG, top: LONG, right: LONG, bottom: LONG }
     global LPRECT = @*RECT
 
-    global INITCOMMONCONTROLSEX = @record {
+    global INITCOMMONCONTROLSEX : type <cimport,nodecl> = @record {
         dwSize : DWORD,
         dwICC : DWORD
     }
     global LPINITCOMMONCONTROLSEX = @*INITCOMMONCONTROLSEX
 
-    global NMHDR = @record {
+    global NMHDR : type <cimport,nodecl> = @record {
         hwndFrom : HWND,
         idFrom : usize,
         code : usize,
     }
     global LPNMHDR = @*NMHDR
 
-    global NMCUSTOMDRAW = @record {
+    global NMCUSTOMDRAW : type <cimport,nodecl> = @record {
         hdr : NMHDR,
         dwDrawStage : DWORD,
         hdc : HDC,
@@ -120,7 +128,7 @@ global SW_SHOW : DWORD <comptime> = 5
     }
     global LPNMCUSTOMDRAW = @*NMCUSTOMDRAW
 
-    global TRACKMOUSEEVENT = @record {
+    global TRACKMOUSEEVENT : type <cimport,nodecl> = @record {
         cbSize : DWORD,
         dwFlags : DWORD,
         hwndTrack : HWND,
@@ -128,11 +136,22 @@ global SW_SHOW : DWORD <comptime> = 5
     }
     global LPTRACKMOUSEEVENT = @*TRACKMOUSEEVENT
 
-    global SIZE = @record {
+    global SIZE : type <cimport,nodecl> = @record {
         cx : LONG,
         cy : LONG,
     }
     global LPSIZE = @*SIZE
+
+    global COMBOBOXINFO : type <cimport,nodecl> = @record {
+        cbSize: DWORD,
+        rcItem: RECT,
+        rcButton: RECT,
+        stateButton: DWORD,
+        hwndCombo: HWND,
+        hwndItem: HWND,
+        hwndList: HWND,
+    }
+    global LPCOMBOBOXINFO = @*COMBOBOXINFO
 
 
 --End of Structs
@@ -194,29 +213,8 @@ global SW_SHOW : DWORD <comptime> = 5
 -- End of Common Constants
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 local function MultiByteToWideChar(CodePage: cuint, dwFlags: culong, lpMultiByteStr: LPCCH, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint <cimport,cinclude'<windows.h>',nodecl> end
 local function WideCharToMultiByte(CodePage: cuint, dwFlags: culong, lpWideCharStr: LPCWCH, cchWideChar: cint, lpMultiByteStr: LPSTR, cbMultiByte: cint, lpDefaultChar: LPCCH, lpUsedDefaultChar: LPBOOL): cint <cimport,cinclude'<windows.h>',nodecl> end
-
-
-
-
-
-
-
-
 
 global function HandleToULong(h: pointer): culong <cimport,nodecl> end
 global function HandleToLong(h: pointer): clong <cimport,nodecl> end
@@ -234,37 +232,9 @@ global function LongToPtr(l: clong): pointer <cimport,nodecl> end
 global function ULongToPtr(ul: culong): pointer <cimport,nodecl> end
 global function Ptr32ToPtr(p: pointer): pointer <cimport,nodecl> end
 global function Handle32ToHandle(h: pointer): pointer <cimport,nodecl> end
-global function PtrToPtr32(p: pointer): pointer <cimport,nodecl> end
+global function PtrToPtr32(p: pointer): pointer <cimport,nodecl, cinclude 'winuser.h'> end
 
 
-
-
-
-
-
-
-global WC_BUTTONW : *cwchar_t
-
-local CP_UTF8: cuint <comptime> = 65001
-local function utf8_to_utf16(s: string): wstring
-    local len: cint = MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, nilptr, 0)
-    --if len <= 0 then return wstring{} end -- empty or failed
-    local data: span(cwchar_t) = default_allocator:spanalloc(@cwchar_t, len+1) -- allocate 1 extra for 0
-    if MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, &data[0], len) ~= len then -- failed?
-    default_allocator:spandealloc(data)
-    return wstring{}
-    end
-    data[len] = 0 -- set 0
-    return (@wstring){data=data}
-end
-global function wstrPtr(str : string) : LPCWSTR
-    local result : wstring = utf8_to_utf16(str)
-    return &result.data[0]
-end
-
-global function toWstrArray(str: string): wstring
-    return utf8_to_utf16(str)
-end
 
 
 global function makeIntResW(i : auto) : LPCWSTR return (@LPCWSTR)((pointer)((@*culong)(i))) end
@@ -295,6 +265,12 @@ global function SendMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPAR
 global function PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
 global function DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
 global function TrackMouseEvent(lpEventTrack: LPTRACKMOUSEEVENT): BOOL <cimport,nodecl> end
+global function SetWindowTextW(hwnd: HWND, lpString: LPCWSTR): BOOL <cimport,nodecl> end
+global function GetWindowTextLengthW(hwnd: HWND): cint <cimport,nodecl> end
+global function GetWindowTextW(hwnd: HWND, lpString: LPWSTR, nMaxCount: cint): cint <cimport,nodecl> end
+global function GetWindowRect(hwnd: HWND, lpRect: LPRECT): BOOL <cimport,nodecl> end
+global function GetMessagePos(): DWORD <cimport,nodecl> end
+global function PtInRect(lpRect: LPRECT <const>, pt : POINT): BOOL <cimport,nodecl> end
 
 global function RegisterClassExW(a1: LPWNDCLASSEXW): cushort <cimport,nodecl> end
 
@@ -330,6 +306,8 @@ global function UpdateWindow(hWnd: HWND): BOOL <cimport,nodecl> end
 global function InvalidateRect(hWnd: HWND, lpRect: LPRECT, bErase: BOOL): BOOL <cimport,nodecl> end
 global function FillRect(hDc: HDC, lprc: LPRECT, hbr: HBRUSH): cint <cimport,nodecl> end
 global function GetClientRect(hWnd: HWND, lprc: LPRECT): BOOL <cimport,nodecl> end
+global function RedrawWindow(hWnd: HWND, lprc: LPRECT, hrgnUpdate: HRGN, flags: UINT): BOOL <cimport,nodecl> end
+global function SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, x: cint, y: cint, cx: cint, cy: cint, flags: UINT): BOOL <cimport,nodecl> end
 
 
 global function SetWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR): BOOL <cimport,nodecl> end
@@ -347,12 +325,37 @@ global function CreatePen(iStyle: cint, cWidth: cint, color: COLORREF): HPEN <ci
 global function CreateCompatibleDC(hdc: HDC): HDC <cimport,nodecl> end
 global function CreateCompatibleBitmap(hdc: HDC, cx: cint, cy: cint): HBITMAP <cimport,nodecl> end
 global function CreatePatternBrush(hbm: HBITMAP): HBRUSH <cimport,nodecl> end
+global function SetBkColor(hdc : HDC, cref : COLORREF) : COLORREF <cimport,nodecl> end
+global function GetTextExtentPoint32W(hdc : HDC, lpString: LPCWSTR, c: cint, psize: LPSIZE) : BOOL <cimport,nodecl> end
+global function GetStockObject(i : cint) : HGDIOBJ <cimport,nodecl> end
 
 
 
 
 
 --Utility Funcs
+
+    local CP_UTF8: cuint <comptime> = 65001
+    local function utf8_to_utf16(s: string): wstring
+        local len: cint = MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, nilptr, 0)
+        --if len <= 0 then return wstring{} end -- empty or failed
+        local data: span(cwchar_t) = default_allocator:spanalloc(@cwchar_t, len+1) -- allocate 1 extra for 0
+        if MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, &data[0], len) ~= len then -- failed?
+            default_allocator:spandealloc(data)
+            return wstring{}
+        end
+        data[len] = 0 -- set 0
+        return (@wstring){data=data}
+    end
+    global function toUTF16(str : string) : LPCWSTR
+        local result : wstring = utf8_to_utf16(str)
+        return &result.data[0]
+    end
+
+    global function toWstrArray(str: string): wstring
+        return utf8_to_utf16(str)
+    end
+
 
     local function utf16_to_utf8(ws: wstring): string
         local len: cint = WideCharToMultiByte(CP_UTF8, 0, ws.data.data, ws.data.size, nilptr, 0, nilptr, nilptr)
@@ -363,6 +366,10 @@ global function CreatePatternBrush(hbm: HBITMAP): HBRUSH <cimport,nodecl> end
             return string{}
         end
         return s
+    end
+
+    global function toUTF8(wstr : wstring) : string
+        return utf16_to_utf8(wstr)
     end
 
 
