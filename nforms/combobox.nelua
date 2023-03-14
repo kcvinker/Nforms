@@ -13,6 +13,10 @@ require "nforms.common"
 	local CB_GETCOMBOBOXINFO <comptime> = 0x0164
 	local CB_ADDSTRING <comptime> = 0x0143
 	local CB_SETCURSEL <comptime> = 0x014E
+	local CB_GETCURSEL <comptime> = 0x0147
+	local CB_GETLBTEXT <comptime> = 0x0148
+	local CB_GETLBTEXTLEN <comptime> = 0x0149
+	local CB_DELETESTRING <comptime> = 0x0144
 
 	local CBN_SELCHANGE <comptime> = 0x01
 	local CBN_SETFOCUS <comptime> = 0x03
@@ -169,6 +173,84 @@ function ComboBox:addItems(...: varargs)
 	## end
 end
 
+function ComboBox:getSelectedIndex(): integer
+	if self._isCreated then
+		self.selectedIndex = (integer)(SendMessageW(self.handle, CB_GETCURSEL, 0, 0))
+		return self.selectedIndex
+	end
+	return -1
+end
+
+function ComboBox:setSelectedIndex(value: integer)
+	if self._isCreated then
+		SendMessageW(self.handle, CB_SETCURSEL, value, 0)
+	end
+	self.selectedIndex = value
+end
+
+function ComboBox:getSelectedItem(): string
+	local result : string
+	if (self._isCreated) then
+		self.selectedIndex = (integer)(SendMessageW(self.handle, CB_GETCURSEL, 0, 0))
+		local iLen = (integer)(SendMessageW(self.handle, CB_GETLBTEXTLEN, self.selectedIndex, 0))
+		local buffer : span(WCHAR) = default_allocator:spanalloc(@WCHAR, iLen + 1)
+		SendMessageW(self.handle, CB_GETLBTEXT, self.selectedIndex, (@LPARAM)(&buffer[0]))
+		buffer[iLen] = 0
+		result = wcharArrayToString(&buffer[0], iLen + 1)
+	end
+	return result
+end
+
+function ComboBox:resetStyleBits()
+	if (self._style & CBS_DROPDOWNLIST) == CBS_DROPDOWNLIST then
+		self._style = self._style ~ CBS_DROPDOWNLIST
+	end
+	if (self._style & CBS_DROPDOWN) == CBS_DROPDOWN then
+		self._style = self._style ~ CBS_DROPDOWN
+	end
+end
+
+function ComboBox:changeStyle()
+	self.enableInput = not self.enableInput
+	if self._isCreated then
+		self.selectedIndex = (integer)(SendMessageW(self.handle, CB_GETCURSEL, 0, 0))
+		self._recreateEnabled = true
+		DestroyWindow(self.handle)
+		self:resetStyleBits()
+		self._isCreated = false
+		self:createHandle()
+	end
+end
+
+function ComboBox:removeItem(item : auto )
+	local myItem = tostring(item)
+	local cmbItem = toUTF16(myItem)
+	if #self.items > 0 then
+		self.items:removevalue(myItem)
+		if self._isCreated then -- Remove item from combo also.
+			local iIndex = (@integer) SendMessageW(self.handle, CB_FINDSTRING, -1, (@LPARAM)(cmbItem))
+			if iIndex > -1 then SendMessageW(self.handle, CB_DELETESTRING, iIndex, 0) end
+		end
+	end
+end
+
+function ComboBox:removeItemAt(index : integer )
+	if #self.items > 0 then
+		self.items:remove(index)
+		if self._isCreated then
+			SendMessageW(self.handle, CB_DELETESTRING, index, 0)
+		end
+	end
+end
+
+function ComboBox:removeAll()
+	if #self.items > 0 then
+		self.items:clear()
+		if self._isCreated then
+			SendMessageW(self.handle, CB_DELETESTRING, 0, 0)
+		end
+	end
+end
 
 function ComboBox:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
@@ -311,6 +393,7 @@ function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UIN
 	local this = (@*ComboBox)((pointer)(refData))
 	switch msg do
 	case WM_DESTROY then
+		print("Combo's Edit destroyed")
 	    RemoveWindowSubclass(hw, cmbEditWndProc, scID)
 
 	case WM_KEYDOWN then keyDownHandler(this, wpm)
