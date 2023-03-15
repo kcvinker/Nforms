@@ -26,6 +26,11 @@ require "nforms.common"
 	local LB_GETSELITEMS <comptime> = 0x0191
 	local LB_RESETCONTENT <comptime> = 0x0184
 
+	local LB_GETTEXT <comptime> = 0x0189
+	local LB_GETTEXTLEN <comptime> = 0x018A
+	local LB_SETSEL <comptime> = 0x0185
+	local LB_GETCARETINDEX <comptime> = 0x019F
+
 
 	local LBN_ERRSPACE <comptime> = -2
 	local LBN_SELCHANGE <comptime> = 1
@@ -148,6 +153,20 @@ function ListBox:clearItemsInternal()
     UpdateWindow(self.handle)
 end
 
+function ListBox:getItemInternal(index: integer): string
+	local result : string
+	local tLen = SendMessageW(self.handle, LB_GETTEXTLEN, index, 0)
+	if tLen ~= LB_ERR then
+		local buffer: span(WCHAR) = default_allocator:spanalloc(@WCHAR, tLen + 1)
+		SendMessageW(self.handle, LB_GETTEXT, index, (@LPARAM)(&buffer[0]))
+		buffer[tLen] = 0
+		result = wcharArrayToString(&buffer[0], tLen + 1)
+	end
+	return result
+end
+
+
+
 
 -- Public function
 function ListBox:createHandle()
@@ -237,6 +256,68 @@ function ListBox:getSelectedIndices(value: integer): vector(integer)
 	return selItems
 end
 
+function ListBox:setSelectedItem(): string
+	if self._isCreated and self.selectedIndex > -1 then
+		return self:getItemInternal(self.selectedIndex)
+	end
+	return ""
+end
+
+function ListBox:setSelectedItems(): vector(string)
+	local result : vector(string)
+	if self._isCreated then
+		local selCount = SendMessageW(self.handle, LB_GETSELCOUNT, 0, 0)
+		if selCount ~= LB_ERR then
+			local iBuffer : span(integer) = default_allocator:spanalloc(@integer, selCount)
+			result:resize(selCount)
+			SendMessageW(self.handle, LB_GETSELITEMS, selCount, (@LPARAM)(&iBuffer[0]))
+			for _, i in ipairs(iBuffer) do result:push(self:getItemInternal(i)) end
+		end
+	end
+	return result
+end
+
+function ListBox:selectAll()
+	if self._isCreated and self.multiSelection then
+		SendMessageW(self.handle, LB_SETSEL, 1, -1 )
+	end
+end
+
+function ListBox:clearSelection()
+	if self._isCreated then
+		if self.multiSelection then
+			SendMessageW(self.handle, LB_SETSEL, 0, -1 )
+		else
+			SendMessageW(self.handle, LB_SETCURSEL, 0, 0 )
+		end
+	end
+end
+
+function ListBox:getIndex(item: auto): integer
+	local sItem = tostring(item)
+	return (@integer)(SendMessageW(self.handle, LB_FINDSTRINGEXACT, -1, toUTF16(sItem)))
+end
+
+function ListBox:getHotIndex(): integer
+	if self.multiSelection then
+		return (@integer)(SendMessageW(self.handle, LB_GETCARETINDEX, 0, 0))
+	end
+	return -1
+end
+
+function ListBox:getHotItem(): string
+	if self.multiSelection then
+		local index = (@integer)(SendMessageW(self.handle, LB_GETCARETINDEX, 0, 0))
+		if index > -1 then return self:getItemInternal(index) end
+	end
+	return ""
+end
+
+function ListBox:getItem(index: integer): string
+	local iLen = (@integer)(SendMessageW(self.handle, LB_GETTEXTLEN, index, 0))
+	if index ~= LB_ERR then return self:getItemInternal(index) end
+	return ""
+end
 
 function ListBox:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
