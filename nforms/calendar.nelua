@@ -1,0 +1,210 @@
+
+-- Calendar module - Created on 15-Mar-2023 06:57 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+require "nforms.datetime"
+
+--Constants
+	local MCS_WEEKNUMBERS <comptime> = 0x0004
+	local MCS_NOTODAYCIRCLE <comptime> = 0x0008
+	local MCS_NOTODAY <comptime> = 0x0010
+	local MCS_NOTRAILINGDATES <comptime> = 0x0040
+	local MCS_SHORTDAYSOFWEEK <comptime> = 0x0080
+
+	local MCM_FIRST <comptime> = 0x1000
+	local MCM_GETCURSEL <comptime> = MCM_FIRST + 1
+	local MCM_GETMINREQRECT <comptime> = MCM_FIRST + 9
+	local MCM_SETCURRENTVIEW <comptime> = MCM_FIRST + 32
+
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+
+local calNumber = 1
+local function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+global ViewMode = @enum {month = 0, year, decade, centuary}
+global Calendar = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    value : DateTime,
+    viewMode : ViewMode,
+    oldView : ViewMode,
+    showWeekNum : boolean,
+    noTodayCircle : boolean,
+    noToday : boolean,
+    noTrailingDates : boolean,
+    shortDayNames : boolean,
+
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: DWORD,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function Calendar.new(frm : *Form, x: integer, y: integer) : Calendar
+	local this : Calendar
+	this.name = string.format("Calendar_%d", calNumber)
+	this.className = toUTF16("SysMonthCal32")
+	this.width = 100
+	this.height = 100
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = WS_CHILD | WS_VISIBLE
+	this._exStyle = 0
+	this._isTextable = false
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+
+	this.cid = frm._cidNumber
+
+    calNumber = calNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+function Calendar:setCalenderStyles()
+	if self.showWeekNum then self._style = self._style | MCS_WEEKNUMBERS end
+    if self.noTodayCircle then self._style = self._style | MCS_NOTODAYCIRCLE end
+    if self.noToday then self._style = self._style | MCS_NOTODAY end
+    if self.noTrailingDates then self._style = self._style | MCS_NOTRAILINGDATES end
+    if self.shortDayNames then self._style = self._style | MCS_SHORTDAYSOFWEEK end
+end
+
+function Calendar:setSizeAndValue()
+    local rct : RECT
+	SendMessageW(self.handle, MCM_GETMINREQRECT, 0, (@LPARAM)(&rct))
+	SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, rct.right, rct.bottom, SWP_NOMOVE)
+	if self.viewMode ~= ViewMode.month then
+		SendMessageW(self.handle, MCM_SETCURRENTVIEW, 0, (@integer)(self.viewMode))
+	end
+	local st : SYSTEMTIME
+	SendMessageW(self.handle, MCM_GETCURSEL, 0, (@LPARAM)(&st))
+	self.value = DateTime.fromSystemTime(st)
+end
+
+-- function Calendar:calculateAutoSize()
+--     local hdc = GetDC(self.handle)
+--     defer ReleaseDC(self.handle, hdc) end
+--     local ss : SIZE
+--     SelectObject(hdc, self.font.handle)
+--     GetTextExtentPoint32W(hdc, toUTF16(self.text), string.len(self.text), &ss)
+
+--     self.width = ss.cx + 2
+--     self.height = ss.cy
+--     SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, self.width, self.height, SWP_NOMOVE)
+-- end
+
+-- Public function
+function Calendar:createHandle()
+	self:setCalenderStyles()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), calWndProc)
+		self:setSizeAndValue()
+	end
+end
+
+-- function Calendar:setText(txt: string)
+-- 	self.text = txt
+-- 	if self._isCreated then	setControlText(self.handle, txt) end
+-- end
+
+-- function Calendar:getText(txt: string): string
+-- 	if self._isCreated then
+-- 		local wstr = getControlText(self.handle)
+-- 		self.text = toUTF8(wstr)
+-- 		return self.text
+-- 	else
+-- 		return self.text
+-- 	end
+-- end
+
+-- function Calendar:setForeColor(clr: uinteger)
+-- 	self.foreColor = Color.new(clr)
+-- 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+-- 	invalidateNow(self)
+-- end
+
+-- function Calendar:setBackColor(clr: uinteger)
+-- 	self.backColor = Color.new(clr)
+-- 	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+-- 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+-- 	invalidateNow(self)
+-- end
+
+function Calendar:destroy()
+	print("Calendar destroyed")
+	-- DeleteObject(self._bkBrush)
+end
+
+function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*Calendar)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, calWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+	-- case MM_Calendar_COLOR then
+    --     local hdc = (HDC)(wpm)
+	-- 	if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+    --     SetBkColor(hdc, this.backColor.ref)
+	-- 	return (LRESULT)(this._bkBrush) --(GetStockObject(HOLLOW_BRUSH))
+	end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
