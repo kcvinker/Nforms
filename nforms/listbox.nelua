@@ -14,13 +14,27 @@ require "nforms.common"
 	local LBS_MULTIPLESEL <comptime> = 0x00000008
 	local LBS_MULTICOLUMN <comptime> = 0x00002000
 	local LBS_NOSEL <comptime> = 0x00000000
+
 	local LBS_WANTKEYBOARDINPUT <comptime> = 0x00000400
 	local WS_HSCROLL <comptime> = 0x00100000
 	local WS_VSCROLL <comptime> = 0x00200000
+
 	local LB_ADDSTRING <comptime> = 0x0180
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+	local LB_GETCURSEL <comptime> = 0x0188
+	local LB_SETCURSEL <comptime> = 0x0186
+	local LB_GETSELCOUNT <comptime> = 0x0190
+	local LB_GETSELITEMS <comptime> = 0x0191
+	local LB_RESETCONTENT <comptime> = 0x0184
+
+
+	local LBN_ERRSPACE <comptime> = -2
+	local LBN_SELCHANGE <comptime> = 1
+	local LBN_DBLCLK <comptime> = 2
+	local LBN_SELCANCEL <comptime> = 3
+	local LBN_SETFOCUS <comptime> = 4
+	local LBN_KILLFOCUS <comptime> = 5
+	local LB_ERR <comptime> = -1
+
 --End
 
 -- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
@@ -79,6 +93,10 @@ global ListBox = @record
 	onMouseMove: MouseEventHandler,
 	onMouseLeave: EventHandler,
 	onCheckedChanged: EventHandler,
+	onDoubleClick: EventHandler,
+	onLostFocus: EventHandler,
+	onGotFocus: EventHandler,
+	onSelectionChanged: EventHandler,
 	-- onKeyUp: KeyEventHandler,
 	-- onKeyPress: KeyEventHandler,
 }
@@ -97,7 +115,7 @@ function ListBox.new(frm : *Form, x: integer, y: integer, w: integer, h: integer
 	this.cid = frm._cidNumber
 	this._style = WS_VISIBLE | WS_CHILD | WS_BORDER  | LBS_NOTIFY | LBS_HASSTRINGS
 	this._exStyle = 0
-	this.backColor = frm.backColor
+	this.backColor = colorWhite
 	this.foreColor = colorBlack
 
     lbxNumber = lbxNumber + 1
@@ -125,6 +143,12 @@ function ListBox:fillItems()
 	end
 end
 
+function ListBox:clearItemsInternal()
+	SendMessageW(self.handle, LB_RESETCONTENT, 0, 0)
+    UpdateWindow(self.handle)
+end
+
+
 -- Public function
 function ListBox:createHandle()
 	self:setLbxStyle()
@@ -151,6 +175,68 @@ function ListBox:addItems(...: varargs)
 		end
 	## end
 end
+
+function ListBox:removeItem(item : auto )
+	local myItem = tostring(item)
+	if #self.items > 0 then
+		self.items:removevalue(myItem)
+		if self._isCreated then -- Remove item from combo also.
+			self:clearItemsInternal()
+			for _, item in ipairs(self.items) do
+				SendMessageW(self.handle, LB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
+			end
+		end
+	end
+end
+
+function ListBox:removeItemAt(index : integer )
+	if #self.items > 0 then
+		self.items:remove(index)
+		if self._isCreated then
+			self:clearItemsInternal()
+			for _, item in ipairs(self.items) do
+				SendMessageW(self.handle, LB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
+			end
+		end
+	end
+end
+
+function ListBox:removeAll()
+	if #self.items > 0 then
+		self.items:clear()
+		if self._isCreated then
+			SendMessageW(self.handle, LB_RESETCONTENT, 0, 0)
+		end
+	end
+end
+
+function ListBox:getSelectedIndex(): integer
+	if self._isCreated then
+		self.selectedIndex = (integer)(SendMessageW(self.handle, LB_GETCURSEL, 0, 0))
+		return self.selectedIndex
+	end
+	return -1
+end
+
+function ListBox:setSelectedIndex(value: integer)
+	if self._isCreated then
+		SendMessageW(self.handle, LB_SETCURSEL, value, 0)
+	end
+	self.selectedIndex = value
+end
+
+function ListBox:getSelectedIndices(value: integer): vector(integer)
+	local selItems : vector(integer)
+	if self.multiSelection and self._isCreated then
+		local selCount = SendMessageW(self.handle, LB_GETSELCOUNT, 0, 0)
+		if selCount ~= LB_ERR then
+			selItems:reserve(selCount)
+			SendMessageW(self.handle, LB_GETSELITEMS, selCount, (@LPARAM)(&selItems[0]))
+		end
+	end
+	return selItems
+end
+
 
 function ListBox:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
@@ -190,35 +276,46 @@ function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
 
-    -- case MM_CTL_COMMAND then
-    --     this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
-    --     if this.onCheckedChanged ~= nilptr then
-    --         local ea = EventArgs {}
-    --         this.onCheckedChanged(this, &ea)
-    --     end
+    case MM_CTL_COMMAND then
+		local nCode = hiWord(wpm)
+		switch nCode do
+			case LBN_DBLCLK then
+				if this.onDoubleClick ~= nilptr then
+					local ea : EventArgs = {}
+					this.onDoubleClick(this, &ea)
+				end
+			case LBN_KILLFOCUS then
+				if this.onLostFocus ~= nilptr then
+					local ea : EventArgs = {}
+					this.onLostFocus(this, &ea)
+				end
+			case LBN_SELCHANGE then
+				if not this.multiSelection then
+					local selIndx = SendMessageW(this.handle, LB_GETCURSEL, 0, 0)
+					if selIndx ~= LB_ERR then
+						this.selectedIndex = (@integer)(selIndx)
+						if this.onSelectionChanged ~= nilptr then
+							local ea : EventArgs = {}
+							this.onSelectionChanged(this, ea)
+						end
+					end
+				end
+			case LBN_SETFOCUS then
+				if this.onGotFocus ~= nilptr then
+					local ea : EventArgs = {}
+					this.onGotFocus(this, &ea)
+				end
+			-- case LBN_SELCANCEL then
 
-	-- case MM_LABEL_COLOR then
-    --     local hdc = (HDC)(wpm)
-    --     SetBkColor(hdc, this.backColor.ref)
-	-- 	return (LRESULT)(this._bkBrush)
+		end
 
-    -- case MM_NOTIFY_REFLECT then
-    --     local nmc = (@LPNMCUSTOMDRAW)(lpm)
-    --     switch nmc.dwDrawStage do
-    --         case CDDS_PREERASE then return CDRF_NOTIFYPOSTERASE
-    --         case CDDS_PREPAINT then
-    --             local rct = nmc.rc
-    --             if not this.rightAlign then  -- Adjusing rect. Otherwise, text will be drawn upon the check area
-    --                 rct.left = rct.left + 18
-    --             else
-    --                 rct.right = rct.right - 18
-    --             end
-    --             SetTextColor(nmc.hdc, this.foreColor.ref)
-    --             DrawTextW(nmc.hdc, toUTF16(this.text), -1, &rct, this._dwTxtFlag)
-    --             return CDRF_SKIPDEFAULT
-    --     end
-
-
+	case MM_LIST_COLOR then
+        if this._drawFlag > 0 then
+			local hdc = (HDC)(wpm)
+			if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
+			if (this._drawFlag & 2) == 2 then SetBkColor(hdc, this.backColor.ref) end
+		end
+		return (LRESULT)(this._bkBrush)
 	end
 
 	return DefSubclassProc(hw, msg, wpm, lpm)
