@@ -1,7 +1,6 @@
 
 -- Calendar module - Created on 15-Mar-2023 06:57 PM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
@@ -16,11 +15,29 @@ require "nforms.datetime"
 	local MCS_SHORTDAYSOFWEEK <comptime> = 0x0080
 
 	local MCM_FIRST <comptime> = 0x1000
+	local MCN_FIRST <comptime> = (0-746)
 	local MCM_GETCURSEL <comptime> = MCM_FIRST + 1
 	local MCM_GETMINREQRECT <comptime> = MCM_FIRST + 9
 	local MCM_SETCURRENTVIEW <comptime> = MCM_FIRST + 32
 
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+	local MCN_SELECT <comptime> = MCN_FIRST
+	local MCN_SELCHANGE <comptime> = MCN_FIRST - 3
+	local MCN_VIEWCHANGE <comptime> = MCN_FIRST - 4
+
+	global NMSELCHANGE : type <cimport,nodecl> = @record {
+        nmhdr: NMHDR,
+        stSelStart: SYSTEMTIME,
+        stSelEnd: SYSTEMTIME
+    }
+	global LPNMSELCHANGE = @*NMSELCHANGE
+
+	global NMVIEWCHANGE : type <cimport,nodecl> = @record {
+        nmhdr: NMHDR,
+        dwOldView: DWORD,
+        dwNewView: DWORD
+    }
+	global LPNMVIEWCHANGE = @*NMVIEWCHANGE
+
 --End
 
 
@@ -28,6 +45,7 @@ local calNumber = 1
 local function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global ViewMode = @enum {month = 0, year, decade, centuary}
+
 global Calendar = @record
 {
 	name : string,
@@ -76,6 +94,9 @@ global Calendar = @record
 	onMouseEnter: EventHandler,
 	onMouseMove: MouseEventHandler,
 	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler,
+	onSelectionChanged: EventHandler,
+	onViewChanged: EventHandler,
 	-- onKeyDown: KeyEventHandler,
 	-- onKeyUp: KeyEventHandler,
 	-- onKeyPress: KeyEventHandler,
@@ -102,6 +123,11 @@ function Calendar.new(frm : *Form, x: integer, y: integer) : Calendar
 
     calNumber = calNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
+	if not app.isDateInit then
+		app.isDateInit = true
+		app.iccEx.dwICC = ICC_DATE_CLASSES
+		InitCommonControlsEx(&app.iccEx)
+	end
 	return this
 end
 
@@ -125,18 +151,6 @@ function Calendar:setSizeAndValue()
 	self.value = DateTime.fromSystemTime(st)
 end
 
--- function Calendar:calculateAutoSize()
---     local hdc = GetDC(self.handle)
---     defer ReleaseDC(self.handle, hdc) end
---     local ss : SIZE
---     SelectObject(hdc, self.font.handle)
---     GetTextExtentPoint32W(hdc, toUTF16(self.text), string.len(self.text), &ss)
-
---     self.width = ss.cx + 2
---     self.height = ss.cy
---     SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, self.width, self.height, SWP_NOMOVE)
--- end
-
 -- Public function
 function Calendar:createHandle()
 	self:setCalenderStyles()
@@ -146,34 +160,6 @@ function Calendar:createHandle()
 		self:setSizeAndValue()
 	end
 end
-
--- function Calendar:setText(txt: string)
--- 	self.text = txt
--- 	if self._isCreated then	setControlText(self.handle, txt) end
--- end
-
--- function Calendar:getText(txt: string): string
--- 	if self._isCreated then
--- 		local wstr = getControlText(self.handle)
--- 		self.text = toUTF8(wstr)
--- 		return self.text
--- 	else
--- 		return self.text
--- 	end
--- end
-
--- function Calendar:setForeColor(clr: uinteger)
--- 	self.foreColor = Color.new(clr)
--- 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
--- 	invalidateNow(self)
--- end
-
--- function Calendar:setBackColor(clr: uinteger)
--- 	self.backColor = Color.new(clr)
--- 	self._bkBrush = CreateSolidBrush(self.backColor.ref)
--- 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
--- 	invalidateNow(self)
--- end
 
 function Calendar:destroy()
 	print("Calendar destroyed")
@@ -200,11 +186,32 @@ function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
 
-	-- case MM_Calendar_COLOR then
-    --     local hdc = (HDC)(wpm)
-	-- 	if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end
-    --     SetBkColor(hdc, this.backColor.ref)
-	-- 	return (LRESULT)(this._bkBrush) --(GetStockObject(HOLLOW_BRUSH))
+	case MM_NOTIFY_REFLECT then
+		local nm = (@LPNMHDR)(lpm)
+		switch nm.code do
+			case MCN_SELECT then
+				local nms = (@LPNMSELCHANGE)(lpm)
+				this.value = DateTime.fromSystemTime(nms.stSelStart)
+				if this.onValueChanged ~= nilptr then
+					local ea: EventArgs = {}
+					this.onValueChanged(this, &ea)
+				end
+			case MCN_SELCHANGE then
+				local nms = (@LPNMSELCHANGE)(lpm)
+				this.value = DateTime.fromSystemTime(nms.stSelStart)
+				if this.onSelectionChanged ~= nilptr then
+					local ea: EventArgs = {}
+					this.onSelectionChanged(this, &ea)
+				end
+			case MCN_VIEWCHANGE then
+				local nmv = (@LPNMVIEWCHANGE)(lpm)
+				this.viewMode = (@ViewMode)(nmv.dwNewView)
+				this.oldView = (@ViewMode)(nmv.dwOldView)
+				if this.onViewChanged ~= nilptr then
+					local ea: EventArgs = {}
+					this.onViewChanged(this, &ea)
+				end
+		end
 	end
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
