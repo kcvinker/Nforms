@@ -1,0 +1,217 @@
+
+-- GroupBox module - Created on 16-Mar-2023 11:54 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local BS_GROUPBOX <comptime> = 0x00000007
+	local BS_NOTIFY <comptime> = 0x00004000
+	local BS_TOP <comptime> = 0x00000400
+	-- local HOLLOW_BRUSH <comptime> = 0
+	-- local ES_WANTRETURN <comptime> = 4096
+	-- local ES_NOHIDESEL <comptime> = 256
+	-- local ES_READONLY <comptime> = 0x800
+	-- local ES_LOWERCASE <comptime> = 16
+	-- local ES_UPPERCASE <comptime> = 8
+
+	-- local ES_NUMBER <comptime> = 0x2000
+	-- local ES_PASSWORD <comptime> = 32
+	-- local ES_CENTER <comptime> = 1
+	-- local ES_RIGHT <comptime> = 2
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+local gbStyle <comptime> = WS_CHILD|WS_VISIBLE|BS_GROUPBOX|BS_NOTIFY|BS_TOP|WS_OVERLAPPED|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
+local gbExStyle <comptime> = WS_EX_RIGHTSCROLLBAR| WS_EX_CONTROLPARENT
+local gbNumber = 1
+local function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global GroupBox = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _pen: HPEN,
+    _txtWidth: integer,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function GroupBox.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : GroupBox
+	local this : GroupBox
+	this.name = string.format("GroupBox_%d", gbNumber)
+	this.className = toUTF16("Button")
+	this.text = txt == "" and this.name or txt
+	this.width = w == 0 and 150 or w
+	this.height = h == 0 and 100 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = gbStyle
+	this._exStyle = gbExStyle
+	this._isTextable = true
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+
+    gbNumber = gbNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+function GroupBox:setBrushAndPen()
+    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+    self._pen = CreatePen(PS_SOLID, 2, self.backColor.ref)
+end
+
+
+function GroupBox:getTextBounds()
+    local hdc: HDC = GetDC(self.handle)
+    defer ReleaseDC(self.handle, hdc) end
+    local ss : SIZE
+    SelectObject(hdc, self.font.handle)
+    GetTextExtentPoint32W(hdc, toUTF16(self.text), #self.text, &ss)
+    self._txtWidth = ss.cx + 8
+end
+
+-- Public function
+function GroupBox:createHandle()
+	self:setBrushAndPen()
+	createControl(self)
+	if self._isCreated then
+        setSubClass(self.handle, (pointer)(self), gbWndProc)
+        self:getTextBounds()
+        print("gb hwnd ", self.text)
+	end
+end
+
+function GroupBox:setText(txt: string)
+	self.text = txt
+	if self._isCreated then	setControlText(self.handle, txt) end
+end
+
+function GroupBox:getText(txt: string): string
+	if self._isCreated then
+		local wstr = getControlText(self.handle)
+		self.text = toUTF8(wstr)
+		return self.text
+	else
+		return self.text
+	end
+end
+
+function GroupBox:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function GroupBox:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+function GroupBox:drawText()
+    local hdc = GetDC(self.handle)
+    defer ReleaseDC(self.handle, hdc) end
+    local yp = 11
+    SetBkMode(hdc, 1)
+
+    SelectObject(hdc, self._pen)
+    MoveToEx(hdc, 10, yp, nilptr)
+    LineTo(hdc, self._txtWidth, yp)
+
+    SelectObject(hdc, self.font.handle)
+    SetTextColor(hdc, self.foreColor.ref)
+    TextOutW(hdc, 10, 0, toUTF16(self.text), #self.text)
+end
+
+function GroupBox:destroy()
+	print("GroupBox destroyed")
+	DeleteObject(self._bkBrush)
+	DeleteObject(self._pen)
+end
+
+function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*GroupBox)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, gbWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+    case WM_ERASEBKGND then
+        if this._drawFlag > 0 then
+            local hdc = (@HDC)(wpm)
+            local rc : RECT
+            GetClientRect(hw, &rc)
+            FillRect(hdc, &rc, this._bkBrush)
+            return 1
+        end
+
+    case WM_PAINT then
+        local ret = DefSubclassProc(hw, msg, wpm, lpm)
+        this:drawText();
+        return ret
+
+    case WM_GETTEXTLENGTH then return 0
+
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
