@@ -1,0 +1,314 @@
+
+
+-- DateTimePicker module - Created on 15-Mar-2023 06:57 PM
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+require "nforms.datetime"
+
+--Constants
+	local MCS_WEEKNUMBERS <comptime> = 0x0004
+	local MCS_NOTODAYCIRCLE <comptime> = 0x0008
+	local MCS_NOTODAY <comptime> = 0x0010
+	local MCS_NOTRAILINGDATES <comptime> = 0x0040
+	local MCS_SHORTDAYSOFWEEK <comptime> = 0x0080
+
+	local MCM_FIRST <comptime> = 0x1000
+	local MCN_FIRST <comptime> = (0-746)
+	local MCM_GETCURSEL <comptime> = MCM_FIRST + 1
+	local MCM_GETMINREQRECT <comptime> = MCM_FIRST + 9
+	local MCM_SETCURRENTVIEW <comptime> = MCM_FIRST + 32
+
+	local MCN_SELECT <comptime> = MCN_FIRST
+	local MCN_SELCHANGE <comptime> = MCN_FIRST - 3
+	local MCN_VIEWCHANGE <comptime> = MCN_FIRST - 4
+
+
+	local DTM_FIRST <comptime> = 0x1000
+	local DTN_FIRST <comptime> = (0-740)
+	local DTN_FIRST2 <comptime> = (0-753)
+	local DTM_GETSYSTEMTIME <comptime> = (DTM_FIRST + 1)
+	local DTM_SETSYSTEMTIME <comptime> = (DTM_FIRST + 2)
+	local DTM_GETRANGE <comptime> = (DTM_FIRST + 3)
+	local DTM_SETRANGE <comptime> = (DTM_FIRST + 4)
+	local DTM_SETFORMATA <comptime> = (DTM_FIRST + 5)
+	local DTM_SETFORMATW <comptime> = (DTM_FIRST + 50)
+	local DTM_SETFORMAT <comptime> = DTM_SETFORMATW
+	local DTM_SETMCCOLOR <comptime> = (DTM_FIRST + 6)
+	local DTM_GETMCCOLOR <comptime> = (DTM_FIRST + 7)
+	local DTM_GETMONTHCAL <comptime> = (DTM_FIRST + 8)
+	local DTM_SETMCFONT <comptime> = (DTM_FIRST + 9)
+	local DTM_GETMCFONT <comptime> = (DTM_FIRST + 10)
+	local DTM_SETMCSTYLE <comptime> = (DTM_FIRST + 11)
+	local DTM_GETMCSTYLE <comptime> = (DTM_FIRST + 12)
+	local DTM_CLOSEMONTHCAL <comptime> = (DTM_FIRST + 13)
+	local DTM_GETDATETIMEPICKERINFO <comptime> = (DTM_FIRST + 14)
+	local DTM_GETIDEALSIZE <comptime> = (DTM_FIRST + 15)
+	local DTS_UPDOWN <comptime> = 0x0001 -- use UPDOWN instead of MONTHCAL
+	local DTS_SHOWNONE <comptime> = 0x0002 -- allow a NONE selection
+	local DTS_SHORTDATEFORMAT <comptime> = 0x0000 -- use the short date format (app must forward WM_WININICHANGE messages)
+	local DTS_LONGDATEFORMAT <comptime> = 0x0004 -- use the long date format (app must forward WM_WININICHANGE messages)
+	local DTS_SHORTDATECENTURYFORMAT <comptime> = 0x000C-- short date format with century (app must forward WM_WININICHANGE messages)
+	local DTS_TIMEFORMAT <comptime> = 0x0009 -- use the time format (app must forward WM_WININICHANGE messages)
+	local DTS_APPCANPARSE <comptime> = 0x0010 -- allow user entered strings (app MUST respond to DTN_USERSTRING)
+	local DTS_RIGHTALIGN <comptime> = 0x0020 -- right-align popup instead of left-align it
+	local DTN_DATETIMECHANGE <comptime> = (DTN_FIRST2 - 6) -- the systemtime has changed, -759
+	local DTN_USERSTRINGW <comptime> = (DTN_FIRST - 5) -- -745
+	local DTN_USERSTRING <comptime> = DTN_USERSTRINGW
+	-- local DTN_USERSTRING <comptime> = DTN_USERSTRINGA
+	-- local NMDATETIMESTRING <comptime> = NMDATETIMESTRINGA
+	-- local LPNMDATETIMESTRING <comptime> = LPNMDATETIMESTRINGA
+	local DTN_WMKEYDOWNA <comptime> = (DTN_FIRST2 - 4) -- modify keydown on app format field (X), , -757
+	local DTN_WMKEYDOWNW <comptime> = (DTN_FIRST - 4) -- -744
+	local DTN_WMKEYDOWN <comptime> = DTN_WMKEYDOWNW
+	local DTN_WMKEYDOWN <comptime> = DTN_WMKEYDOWNA
+	local DTN_FORMATA <comptime> = (DTN_FIRST2 - 3) -- query display for app format field (X), -756
+	local DTN_FORMATW <comptime> = (DTN_FIRST - 3) -- -743
+	local DTN_FORMAT <comptime> = DTN_FORMATW
+
+	local DTN_FORMAT <comptime> = DTN_FORMATA
+	-- local NMDATETIMEFORMAT <comptime> = NMDATETIMEFORMATA
+	-- local LPNMDATETIMEFORMAT <comptime> = LPNMDATETIMEFORMATA
+	local DTN_FORMATQUERYW <comptime> = (DTN_FIRST - 2) -- -742
+	local DTN_FORMATQUERY <comptime> = DTN_FORMATQUERYW
+	-- local NMDATETIMEFORMATQUERY <comptime> = NMDATETIMEFORMATQUERYW
+	-- local LPNMDATETIMEFORMATQUERY <comptime> = LPNMDATETIMEFORMATQUERYW
+	-- local DTN_FORMATQUERY <comptime> = DTN_FORMATQUERYA
+	-- local NMDATETIMEFORMATQUERY <comptime> = NMDATETIMEFORMATQUERYA
+	-- local LPNMDATETIMEFORMATQUERY <comptime> = LPNMDATETIMEFORMATQUERYA
+	local DTN_DROPDOWN <comptime> = (DTN_FIRST2 - 1) -- MonthCal has dropped down, -754
+	local DTN_CLOSEUP <comptime> = (DTN_FIRST2) -- MonthCal is popping up, -753
+
+	global NMSELCHANGE : type <cimport,nodecl> = @record {
+        nmhdr: NMHDR,
+        stSelStart: SYSTEMTIME,
+        stSelEnd: SYSTEMTIME
+    }
+	global LPNMSELCHANGE = @*NMSELCHANGE
+
+	global NMVIEWCHANGE : type <cimport,nodecl> = @record {
+        nmhdr: NMHDR,
+        dwOldView: DWORD,
+        dwNewView: DWORD
+    }
+	global LPNMVIEWCHANGE = @*NMVIEWCHANGE
+
+--End
+
+
+local dtpNumber = 1
+local function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+global DTPFormat = @enum {longDate = 1, shortDate = 2, timeOnly = 4, custom = 8}
+
+global DateTimePicker = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+
+    format: DTPFormat,
+    formatString: string,
+    rightAlign: boolean,
+    fourDigitYear: boolean,
+    value : DateTime,
+    showWeekNum : boolean,
+    noTodayCircle : boolean,
+    noToday : boolean,
+    noTrailingDates : boolean,
+    shortDayNames : boolean,
+    showUpdown : boolean,
+
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: DWORD,
+    _dropDownCount: integer,
+    _calStyle: DWORD,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler,
+	onCalendarOpened: EventHandler,
+	onCalendarClosed: EventHandler,
+    onTextChanged: DateTimeEventHandler,
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function DateTimePicker.new(frm : *Form, x: integer, y: integer) : DateTimePicker
+	local this : DateTimePicker
+	this.name = string.format("DateTimePicker_%d", dtpNumber)
+	this.className = toUTF16("SysDateTimePick32")
+	this.width = 10
+	this.height = 10
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = WS_CHILD | WS_VISIBLE | WS_TABSTOP
+	this._exStyle = 0
+	this._isTextable = false
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+
+	this.cid = frm._cidNumber
+
+    dtpNumber = dtpNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	if not app.isDateInit then
+		app.isDateInit = true
+		app.iccEx.dwICC = ICC_DATE_CLASSES
+		InitCommonControlsEx(&app.iccEx)
+	end
+	return this
+end
+
+function DateTimePicker:setDTPStyles()
+	switch self.format do
+    case DTPFormat.custom then
+        self._style = self._style | DTS_LONGDATEFORMAT | DTS_APPCANPARSE
+    case DTPFormat.longDate then
+        self._style = self._style | DTS_LONGDATEFORMAT
+    case DTPFormat.shortDate then
+        if self.fourDigitYear then
+            self._style = self._style | DTS_SHORTDATECENTURYFORMAT
+        else
+            self._style = self._style | DTS_SHORTDATEFORMAT
+        end
+    case DTPFormat.timeOnly then
+        self._style = self._style |DTS_TIMEFORMAT
+    end
+
+    if self.showWeekNum then self._calStyle = self._calStyle | MCS_WEEKNUMBERS end
+    if self.noTodayCircle then self._calStyle = self._calStyle | MCS_NOTODAYCIRCLE end
+    if self.noToday then self._calStyle = self._calStyle | MCS_NOTODAY end
+    if self.noTrailingDates then self._calStyle = self._calStyle | MCS_NOTRAILINGDATES end
+    if self.shortDayNames then self._calStyle = self._calStyle | MCS_SHORTDAYSOFWEEK end
+
+    if self.rightAlign then self._style = self._style | DTS_RIGHTALIGN end
+    if self.showUpdown then self._style = self._style | DTS_UPDOWN end
+end
+
+function DateTimePicker:setSizeAndValue()
+	if self.format == DTPFormat.custom then
+		-- Although we are using 'W' based unicode functions & messages,
+		-- here we must use ANSI message. DTM_SETFORMATW won't work here for unknown reason.
+		SendMessageW(self.handle, DTM_SETFORMATA, 0, (@LPARAM)(&self.formatString[0]))
+	end
+    if self._calStyle > 0 then SendMessageW(self.handle, DTM_SETMCSTYLE, 0, self._calStyle) end
+	local ss: SIZE
+	SendMessageW(self.handle, DTM_GETIDEALSIZE, 0, (@LPARAM)(&ss))
+	self.width = ss.cx + 2
+	self.height = ss.cy + 5
+	SetWindowPos(self.handle, nilptr, self.xpos, self.ypos, self.width, self.height, SWP_NOZORDER)
+end
+
+-- Public function
+function DateTimePicker:createHandle()
+	self:setDTPStyles()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), dtpWndProc)
+		self:setSizeAndValue()
+	end
+end
+
+function DateTimePicker:destroy()
+	print("DateTimePicker destroyed")
+	-- DeleteObject(self._bkBrush)
+end
+
+function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*DateTimePicker)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, dtpWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+	case MM_NOTIFY_REFLECT then
+		local nm = (@LPNMHDR)(lpm)
+		switch nm.code do
+			case DTN_USERSTRING then
+				if this.onTextChanged ~= nilptr then
+					local dts = (@LPNMDATETIMESTRINGW)(lpm)
+					local dtea = DateTimeEventArgs.new(dts.pszUserString)
+					this.onTextChanged(this, &dtea)
+					if dtea.handled then
+						SendMessageW(hw, DTM_SETSYSTEMTIME, 0, (@LPARAM)(dtea.dateStruct))
+					end
+				end
+			case DTN_DROPDOWN then
+				if this.onCalendarOpened ~= nilptr then
+					local ea: EventArgs = {}
+					this.onCalendarOpened(this, &ea)
+				end
+			case DTN_DATETIMECHANGE then
+				if this._dropDownCount == 0 then
+					this._dropDownCount = 1
+					local nmd = (@LPNMDATETIMECHANGE)(lpm)
+					this.value = DateTime.fromSystemTime(nmd.st)
+					if this.onValueChanged ~= nilptr then
+						local ea: EventArgs = {}
+						this.onValueChanged(this, &ea)
+					end
+				elseif this._dropDownCount == 1 then
+					this._dropDownCount = 0
+					return 0
+				end
+
+			case DTN_CLOSEUP then
+				if this.onCalendarClosed ~= nilptr then
+					local ea: EventArgs = {}
+					this.onCalendarClosed(this, &ea)
+				end
+
+			case DTN_FORMATQUERY then
+		end
+	end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
