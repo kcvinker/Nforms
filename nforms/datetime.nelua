@@ -1,0 +1,30 @@
+
+-- DateTime module - Created on -Mar-2023 07:10
+require "nforms.apifuncs"
+global WeekDays = @enum {sunday = 0, monday, tuesday, wednesday, thursday, friday, saturday}
+
+global DateTime = @record {
+    year : integer,
+    month: integer,
+    day: integer,
+    hour: integer,
+    minute: integer,
+    second: integer,
+    milliSecond : integer,
+    dayOfWeek : WeekDays,
+}
+
+
+
+function DateTime.fromSystemTime(st: SYSTEMTIME): DateTime
+    local dt : DateTime
+    dt.year = (integer)(st.wYear)
+    dt.month = (integer)(st.wMonth)
+    dt.day = (integer)(st.wDay)
+    dt.hour = (integer)(st.wHour)
+    dt.minute = (integer)(st.wMinute)
+    dt.second = (integer)(st.wSecond)
+    dt.milliSecond = (integer)(st.wMilliseconds)
+    dt.dayOfWeek = (@WeekDays)(st.wDayOfWeek)
+    return dt
+end
