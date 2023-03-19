@@ -73,18 +73,18 @@ global NumberPicker = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-    minRange: float64,
-    maxRange: float64,
+    minRange: number,
+    maxRange: number,
     textAlign: TextAlign,
 	buttonLeft: boolean,
     hasSeperator: boolean,
 	autoRotate: boolean,
 	hideCaret: boolean,
-    value: float64,
-    step: float64,
+    value: number,
+    step: number,
     formatString: string,
     decimalPrecision: integer,
-    trackMouseLeave: boolean,
+    trackMouseLeave: boolean, -- Set this true if you want to use mouse enter and/or mouse leave events
 
 	--Private fields
 	_isCreated: boolean,
@@ -136,7 +136,7 @@ function NumberPicker.new(frm : *Form, x: integer, y: integer, w: integer, h: in
 	this.name = string.format("NumberPicker_%d", npNumber)
 	this.className = toUTF16("msctls_updown32")
 	-- this.text = txt == "" and this.name or txt
-	this.width = w == 0 and 110 or w
+	this.width = w == 0 and 90 or w
 	this.height = h == 0 and 27 or h
 	this.xpos = x == 0 and 20 or x
 	this.ypos = y == 0 and 20 or y
@@ -181,6 +181,7 @@ function NumberPicker:setNPStyle()
         case TextAlign.Center then self._buddyStyle = self._buddyStyle | ES_CENTER
         case TextAlign.Right then self._buddyStyle = self._buddyStyle | ES_RIGHT
     end
+    self._myRect = {self.xpos, self.ypos, (self.xpos - self.width), (self.ypos - self.height)}
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
@@ -229,8 +230,8 @@ function NumberPicker:createHandle()
             GetClientRect(self._buddyHwnd, &self._buddyRect)
             GetClientRect(self.handle, &self._updRect)
             self:resizeBuddy()
-            SendMessageW(oldBuddy, MM_BUDDY_RESIZE, 0, 0)
             self:displayValue()
+            if oldBuddy ~= nilptr then SendMessageW(oldBuddy, MM_BUDDY_RESIZE, 0, 0) end
 		end
 	end	
 	local xp = 1 << 32
@@ -239,7 +240,7 @@ function NumberPicker:createHandle()
 end
 
 function NumberPicker:setValueInternal(delta: cint)
-	local newValue : float64 = self.value + (delta * self.step)
+	local newValue : number = self.value + (delta * self.step)
     if self.autoRotate then
         if newValue > self.maxRange then
             self.value = self.minRange
@@ -263,6 +264,11 @@ end
 -- 		return self.text
 -- 	end
 -- end
+
+function NumberPicker:setValue(value: number)
+	self.value = value
+	if self._isCreated then self:displayValue() end
+end
 
 function NumberPicker:setForeColor(clr: uinteger)
 	self.foreColor = Color.new(clr)
@@ -405,6 +411,7 @@ function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT
    		switch nCode do
    			case EN_UPDATE then if this.hideCaret then HideCaret(hw) end
    		end
+   	case MM_BUDDY_RESIZE then this:resizeBuddy()
 
    	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
 	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
