@@ -1,0 +1,419 @@
+
+-- NumberPicker module - Created on 17-Mar-2023 11:33 AM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+
+	local UDN_FIRST <comptime> = UINT_MAX-721
+	local UDS_WRAP <comptime> = 0x0001
+	local UDS_SETBUDDYINT <comptime> = 0x0002
+	local UDS_ALIGNRIGHT <comptime> = 0x0004
+	local UDS_ALIGNLEFT <comptime> = 0x0008
+	local UDS_AUTOBUDDY <comptime> = 0x0010
+	local UDS_ARROWKEYS <comptime> = 0x0020
+	local UDS_HORZ <comptime> = 0x0040
+	local UDS_NOTHOUSANDS <comptime> = 0x0080
+	local UDS_HOTTRACK <comptime> = 0x0100
+	local UDM_SETRANGE <comptime> = (WM_USER+101)
+	local UDM_GETRANGE <comptime> = (WM_USER+102)
+	local UDM_SETPOS <comptime> = (WM_USER+103)
+	local UDM_GETPOS <comptime> = (WM_USER+104)
+	local UDM_SETBUDDY <comptime> = (WM_USER+105)
+	local UDM_GETBUDDY <comptime> = (WM_USER+106)
+	local UDM_SETACCEL <comptime> = (WM_USER+107)
+	local UDM_GETACCEL <comptime> = (WM_USER+108)
+	local UDM_SETBASE <comptime> = (WM_USER+109)
+	local UDM_GETBASE <comptime> = (WM_USER+110)
+	local UDM_SETRANGE32 <comptime> = (WM_USER+111)
+	local UDM_GETRANGE32 <comptime> = (WM_USER+112) -- wParam & lParam are LPINT
+	-- local UDM_SETUNICODEFORMAT <comptime> = CCM_SETUNICODEFORMAT
+	-- local UDM_GETUNICODEFORMAT <comptime> = CCM_GETUNICODEFORMAT
+	local UDM_SETPOS32 <comptime> = (WM_USER+113)
+	local UDM_GETPOS32 <comptime> = (WM_USER+114)
+	local UDN_DELTAPOS <comptime> = (UDN_FIRST - 1)
+
+	local ES_NUMBER <comptime> = 0x2000
+	local ES_LEFT <comptime> = 0
+	local ES_CENTER <comptime> = 1
+	local ES_RIGHT <comptime> = 2
+	local EN_UPDATE <comptime> = 0x0400
+
+	local BDR_SUNKENOUTER <comptime> = 0x0002
+	local BDR_RAISEDINNER <comptime> = 0x0004
+	-- local ES_CENTER <comptime> = 1
+	-- local ES_RIGHT <comptime> = 2
+	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
+--End
+
+-- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
+-- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local npNumber = 1
+local swp_flag = SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER
+local function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+local function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global NumberPicker = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    minRange: float64,
+    maxRange: float64,
+    textAlign: TextAlign,
+	buttonLeft: boolean,
+    hasSeperator: boolean,
+	autoRotate: boolean,
+	hideCaret: boolean,
+    value: float64,
+    step: float64,
+    formatString: string,
+    decimalPrecision: integer,
+    trackMouseLeave: boolean,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _buddyStyle: DWORD,
+    _buddyExStyle: DWORD,
+    _topEdgeFlag: DWORD,
+    _botEdgeFlag: DWORD,
+    _buddyHwnd: HWND,
+    _buddySCID: UINT_PTR,
+    _buddyRect: RECT,
+    _updRect: RECT,
+    _myRect: RECT,
+    _txtPos: TextAlign,
+    _lineX: integer,
+    _buddyCID: integer,
+    _dwTxtFlag: DWORD,
+    _trackMouseLeave: boolean,
+    _keyPressed: boolean,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	
+	onValueChanged: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function NumberPicker.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : NumberPicker
+	local this : NumberPicker
+	this.name = string.format("NumberPicker_%d", npNumber)
+	this.className = toUTF16("msctls_updown32")
+	-- this.text = txt == "" and this.name or txt
+	this.width = w == 0 and 110 or w
+	this.height = h == 0 and 27 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = WS_VISIBLE|WS_CHILD | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_AUTOBUDDY | UDS_HOTTRACK
+	this._exStyle = 0
+    this._buddyStyle = WS_CHILD | WS_VISIBLE | ES_NUMBER | WS_TABSTOP | WS_BORDER
+    this._buddyExStyle = WS_EX_LTRREADING | WS_EX_LEFT
+    this._dwTxtFlag = DT_SINGLELINE | DT_VCENTER
+	this._isTextable = false
+	this.backColor = colorWhite
+	this.foreColor = colorBlack
+    this._topEdgeFlag = BF_TOPLEFT
+    this._botEdgeFlag = BF_BOTTOM
+	this.minRange = 0
+	this.maxRange = 100
+	this.decimalPrecision = 0
+	this.formatString = "%.2f"
+	this.step = 1
+
+    npNumber = npNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	this._buddyCID = frm._cidNumber
+	frm._cidNumber = frm._cidNumber + 1
+
+	return this
+end
+
+function NumberPicker:setNPStyle()
+	if self.buttonLeft then
+        self._style = self._style ~ UDS_ALIGNRIGHT
+        self._style = self._style | UDS_ALIGNLEFT
+        self._topEdgeFlag = BF_TOP
+        self._botEdgeFlag = BF_BOTTOMRIGHT
+        if self._txtPos == TextAlign.Left then self._txtPos = TextAlign.Right end
+    end
+    --if (!self.mHasSep) self._style = self._style |= UDS_NOTHOUSANDS
+    switch self._txtPos do
+        case TextAlign.Left then self._buddyStyle = self._buddyStyle | ES_LEFT
+        case TextAlign.Center then self._buddyStyle = self._buddyStyle | ES_CENTER
+        case TextAlign.Right then self._buddyStyle = self._buddyStyle | ES_RIGHT
+    end
+    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+end
+
+
+function NumberPicker:createBuddy()
+	if self.buttonLeft then self.width = self.width - 2 end
+    self._buddyHwnd = CreateWindowExW(self._buddyExStyle, toUTF16("Edit"), nilptr, self._buddyStyle,
+										self.xpos, self.ypos, self.width, self.height,
+                                		self.parent.handle, (@HMENU)(self._buddyCID), self.parent.hInstance, nilptr)
+	if self._buddyHwnd ~= nilptr then		
+		setSubClass(self._buddyHwnd, (pointer)(self), npEditWndProc)
+		self.font:setFontInternal(self._buddyHwnd)
+	end
+end
+
+function NumberPicker:resizeBuddy()
+	if self.buttonLeft then
+        self._lineX = self._buddyRect.left
+        SetWindowPos(self._buddyHwnd, HWND_TOP,
+                        (self.xpos + self._updRect.right), self.ypos,
+                        self._buddyRect.right, self._buddyRect.bottom, swp_flag);
+    else 
+        self._lineX = self._buddyRect.right - 3
+        SetWindowPos(self._buddyHwnd, HWND_TOP, self.xpos, self.ypos,
+                        (self._buddyRect.right - 2), self._buddyRect.bottom, swp_flag);
+    end
+end
+
+function NumberPicker:displayValue()
+	local newStr = string.format(self.formatString, self.value)
+	SetWindowTextW(self._buddyHwnd, toUTF16(newStr))	
+end
+
+-- Public function
+function NumberPicker:createHandle()
+	self:setNPStyle()
+	createControl(self) -- First create the updown control.
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), npWndProc)
+		self:createBuddy() -- Then create the buddy
+		if self._buddyHwnd ~= nilptr then
+			local oldBuddy = (@HWND)(SendMessageW(self.handle, UDM_SETBUDDY, (@WPARAM)(self._buddyHwnd), 0)) -- set the edit as updown's buddy.
+            SendMessageW(self.handle, UDM_SETRANGE32, (@WPARAM)(self.minRange), (@LPARAM)(self.maxRange))
+
+            -- Collecting both controls rects
+            GetClientRect(self._buddyHwnd, &self._buddyRect)
+            GetClientRect(self.handle, &self._updRect)
+            self:resizeBuddy()
+            SendMessageW(oldBuddy, MM_BUDDY_RESIZE, 0, 0)
+            self:displayValue()
+		end
+	end	
+	local xp = 1 << 32
+	print("xppp  ", xp) -- 4294966574, 4294967296
+
+end
+
+function NumberPicker:setValueInternal(delta: cint)
+	local newValue : float64 = self.value + (delta * self.step)
+    if self.autoRotate then
+        if newValue > self.maxRange then
+            self.value = self.minRange
+        elseif newValue < self.minRange then
+            self.value = self.maxRange
+        else
+            self.value = newValue
+        end
+    else
+        self.value = math.clamp(newValue, self.minRange, self.maxRange)
+    end
+    self:displayValue()
+end
+
+-- function NumberPicker:getText(txt: string): string
+-- 	if self._isCreated then
+-- 		local wstr = getControlText(self.handle)
+-- 		self.text = toUTF8(wstr)
+-- 		return self.text
+-- 	else
+-- 		return self.text
+-- 	end
+-- end
+
+function NumberPicker:setForeColor(clr: uinteger)
+	self.foreColor = Color.new(clr)
+	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+	invalidateNow(self)
+end
+
+function NumberPicker:setBackColor(clr: uinteger)
+	self.backColor = Color.new(clr)
+	self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+	invalidateNow(self)
+end
+
+function NumberPicker:isMouseUponMe(): boolean
+	local pt: POINT
+	GetCursorPos(&pt)
+	ScreenToClient(self.parent.handle, &pt)
+	local ret = PtInRect(&self._myRect, pt)
+	return ret == 1 and true or false
+end
+
+local function remNullChar(x: wstring): string
+	local u8Str = toUTF8(x)
+	return string.subview(u8Str, 0, #u8Str - 1)
+end
+
+function NumberPicker:destroy()
+	print("NumberPicker destroyed")
+	DeleteObject(self._bkBrush)
+end
+
+function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*NumberPicker)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, npWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then 
+		if this._trackMouseLeave then
+			if not this:isMouseUponMe() then
+				this._isMouseEntered = false
+				if this.onMouseLeave ~= nilptr then
+					local ea: EventArgs	= {}
+					this.onMouseLeave(this, &ea)
+				end
+			end
+		end
+	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
+	-- case WM_KEYUP then keyUpHandler(this, wpm)
+	-- case WM_CHAR then keyPressHandler(this, wpm)
+
+    -- case MM_CTL_COMMAND then
+    --     this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
+    --     if this.onCheckedChanged ~= nilptr then
+    --         local ea = EventArgs {}
+    --         this.onCheckedChanged(this, &ea)
+    --     end
+
+	-- case MM_LABEL_COLOR then
+    --     local hdc = (HDC)(wpm)
+    --     SetBkColor(hdc, this.backColor.ref)
+	-- 	return (LRESULT)(this._bkBrush)
+
+    case MM_NOTIFY_REFLECT then    	
+        local nm = (@LPNMUPDOWN)(lpm)        
+    	if nm.hdr.code == UDN_DELTAPOS then
+            local valStr = remNullChar(getControlText(this._buddyHwnd))
+            this.value = tonumber(valStr)
+            this:setValueInternal(nm.iDelta)
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+            end            
+        end
+
+    end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
+
+
+
+function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*NumberPicker)((pointer)(refData))
+	-- print(string.format("[%d] Edit Message : %d", cnt, msg))
+	-- cnt = cnt + 1
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, npEditWndProc, scID)
+
+	case WM_PAINT then
+		DefSubclassProc(hw, msg, wpm, lpm)
+		local hdc : HDC = GetDC(hw)
+        DrawEdge(hdc, &this._buddyRect, BDR_SUNKENOUTER, this._topEdgeFlag)
+        DrawEdge(hdc, &this._buddyRect, BDR_RAISEDINNER, this._botEdgeFlag)
+        local fpen : HPEN = CreatePen(PS_SOLID, 1, this.backColor.ref)
+        defer 
+        	DeleteObject(fpen) 
+        	ReleaseDC(hw, hdc)
+       	end
+        MoveToEx(hdc, this._lineX, this._buddyRect.top + 1, nilptr)
+        SelectObject(hdc, fpen)
+        LineTo(hdc, this._lineX, this._buddyRect.bottom - 1)
+        return 1
+
+	case MM_EDIT_COLOR then
+		if (this._drawFlag & 1) == 1 then SetTextColor((@HDC)(wpm), this.foreColor.ref) end
+        SetBkColor((@HDC)(wpm), this.backColor.ref)
+        return (@LRESULT)(this._bkBrush)
+
+    case WM_KEYDOWN then
+        this._keyPressed = true
+        keyDownHandler(this, wpm)
+    case WM_KEYUP then keyUpHandler(this, wpm)
+    case WM_CHAR then keyPressHandler(this, wpm)
+
+    case WM_MOUSELEAVE then 
+		if this._trackMouseLeave then
+			if not this:isMouseUponMe() then
+				this._isMouseEntered = false
+				if this.onMouseLeave ~= nilptr then
+					local ea: EventArgs	= {}
+					this.onMouseLeave(this, &ea)
+				end
+			end
+		end
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+   	case EM_SETSEL then	return 1
+   	case MM_CTL_COMMAND then
+   		local nCode	= hiWord(wpm)
+   		switch nCode do
+   			case EN_UPDATE then if this.hideCaret then HideCaret(hw) end
+   		end
+
+   	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+
+	end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
