@@ -1,0 +1,599 @@
+
+
+-- TrackBar module - Created on 19-Mar-2023 12:32 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local TRBN_FIRST <comptime> = UINT_MAX - 1501
+	local TBS_AUTOTICKS <comptime> = 0x1
+	local TBS_VERT <comptime> = 0x2
+	local TBS_HORZ <comptime> = 0x0
+	local TBS_TOP <comptime> = 0x4
+	local TBS_BOTTOM <comptime> = 0x0
+	local TBS_LEFT <comptime> = 0x4
+	local TBS_RIGHT <comptime> = 0x0
+	local TBS_BOTH <comptime> = 0x8
+	local TBS_NOTICKS <comptime> = 0x10
+	local TBS_ENABLESELRANGE <comptime> = 0x20
+	local TBS_FIXEDLENGTH <comptime> = 0x40
+	local TBS_NOTHUMB <comptime> = 0x80
+	local TBS_TOOLTIPS <comptime> = 0x100
+	local TBS_REVERSED <comptime> = 0x200
+	local TBS_DOWNISLEFT <comptime> = 0x400
+	local TBS_NOTIFYBEFOREMOVE <comptime> = 0x800
+	local TBS_TRANSPARENTBKGND <comptime> = 0x1000
+	local TBM_GETPOS <comptime> = WM_USER
+	local TBM_GETRANGEMIN <comptime> = WM_USER+1
+	local TBM_GETRANGEMAX <comptime> = WM_USER+2
+	local TBM_GETTIC <comptime> = WM_USER+3
+	local TBM_SETTIC <comptime> = WM_USER+4
+	local TBM_SETPOS <comptime> = WM_USER+5
+	local TBM_SETRANGE <comptime> = WM_USER+6
+	local TBM_SETRANGEMIN <comptime> = WM_USER+7
+	local TBM_SETRANGEMAX <comptime> = WM_USER+8
+	local TBM_CLEARTICS <comptime> = WM_USER+9
+	local TBM_SETSEL <comptime> = WM_USER+10
+	local TBM_SETSELSTART <comptime> = WM_USER+11
+	local TBM_SETSELEND <comptime> = WM_USER+12
+	local TBM_GETPTICS <comptime> = WM_USER+14
+	local TBM_GETTICPOS <comptime> = WM_USER+15
+	local TBM_GETNUMTICS <comptime> = WM_USER+16
+	local TBM_GETSELSTART <comptime> = WM_USER+17
+	local TBM_GETSELEND <comptime> = WM_USER+18
+	local TBM_CLEARSEL <comptime> = WM_USER+19
+	local TBM_SETTICFREQ <comptime> = WM_USER+20
+	local TBM_SETPAGESIZE <comptime> = WM_USER+21
+	local TBM_GETPAGESIZE <comptime> = WM_USER+22
+	local TBM_SETLINESIZE <comptime> = WM_USER+23
+	local TBM_GETLINESIZE <comptime> = WM_USER+24
+	local TBM_GETTHUMBRECT <comptime> = WM_USER+25
+	local TBM_GETCHANNELRECT <comptime> = WM_USER+26
+	local TBM_SETTHUMBLENGTH <comptime> = WM_USER+27
+	local TBM_GETTHUMBLENGTH <comptime> = WM_USER+28
+	local TBM_SETTOOLTIPS <comptime> = WM_USER+29
+	local TBM_GETTOOLTIPS <comptime> = WM_USER+30
+	local TBM_SETTIPSIDE <comptime> = WM_USER+31
+	local TBTS_TOP <comptime> = 0
+	local TBTS_LEFT <comptime> = 1
+	local TBTS_BOTTOM <comptime> = 2
+	local TBTS_RIGHT <comptime> = 3
+	local TBM_SETBUDDY <comptime> = WM_USER+32
+	local TBM_GETBUDDY <comptime> = WM_USER+33
+	local TB_LINEUP <comptime> = 0
+	local TB_LINEDOWN <comptime> = 1
+	local TB_PAGEUP <comptime> = 2
+	local TB_PAGEDOWN <comptime> = 3
+	local TB_THUMBPOSITION <comptime> = 4
+	local TB_THUMBTRACK <comptime> = 5
+	local TB_TOP <comptime> = 6
+	local TB_BOTTOM <comptime> = 7
+	local TB_ENDTRACK <comptime> = 8
+	local TBCD_TICS <comptime> = 0x1
+	local TBCD_THUMB <comptime> = 0x2
+	local TBCD_CHANNEL <comptime> = 0x3
+	local TRBN_THUMBPOSCHANGING <comptime> = TRBN_FIRST-1
+	
+	
+	local THUMB_LINE_LOW <comptime> = 0
+	local THUMB_LINE_HIGH <comptime> = 1
+	local THUMB_PAGE_LOW <comptime> = 2
+	local THUMB_PAGE_HIGH <comptime> = 3
+	local U16_MAX <comptime> = 1 << 16
+--End
+
+-- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
+-- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local tkNumber = 1
+local function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+global ChannelStyle = @enum {Classic = 0, Outline }
+global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
+global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
+
+global TicData = @record {
+	phyPoint: integer,
+	logPoint: integer,
+}
+
+global TrackBar = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+
+	--TrackBar's own properties
+	vertical: boolean,
+    reversed: boolean,
+	noTics: boolean,
+	selectionRange: boolean,
+	defaultTics: boolean,
+	noThumb: boolean,
+	toolTip: boolean,
+	customDraw: boolean,
+	freeMove: boolean,
+	ticWidth: integer,
+	minRange: integer,
+	maxRange: integer,
+	frequency: integer,
+	pageSize: integer,
+	lineSize: integer,
+	ticLength: integer,
+	value: integer,
+	ticColor: Color,
+	channelColor: Color,
+	selectionColor: Color,
+	channelStyle: ChannelStyle,
+	trackChange: TrackChange,
+	ticPosition: TicPosition,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+	_selBrush: HBRUSH,
+	_chnPen: HPEN,
+	_ticPen: HPEN,
+    _chnRect: RECT,
+    _thumbRect: RECT,
+    _myRect: RECT,
+    _thumbHalf: integer,
+    _p1: integer,
+    _p2: integer,
+    _ticCount: integer,
+    _chnFlag: DWORD,
+    _ticList: vector(TicData),
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	
+	onValueChanged: EventHandler,
+	onDragging: EventHandler,
+	onDragged: EventHandler,
+	
+}
+
+-- Public Constructor
+function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : TrackBar
+	local this : TrackBar
+	this.name = string.format("TrackBar_%d", tkNumber)
+	this.className = toUTF16("msctls_trackbar32")
+	this.width = w == 0 and 150 or w
+	this.height = h == 0 and 80 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS
+	this._exStyle = WS_EX_RIGHTSCROLLBAR | WS_EX_LTRREADING |WS_EX_LEFT
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+   
+    this._chnFlag = BF_RECT | BF_ADJUST
+    this.ticWidth = 1
+    this.ticLength = 4
+    this.lineSize = 1 
+    this.minRange = 0
+    this.maxRange = 100
+    this.frequency = 10
+    this.pageSize = 10
+    this.ticPosition = TicPosition.DownSide
+    this.channelStyle = ChannelStyle.Classic
+    this.trackChange = TrackChange.None
+    this.ticColor = Color.new(0x3385ff)
+	this.channelColor = Color.new(0xc2c2a3)
+	this.selectionColor = Color.new(0x99ff33)
+
+    tkNumber = tkNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+-- Private functions
+	function TrackBar:setTkStyle()
+		if self.vertical then
+	        self._style = self._style | TBS_VERT
+	        switch self.ticPosition do
+	            case TicPosition.RightSide then self._style = self._style | TBS_RIGHT
+	            case TicPosition.LeftSide then self._style = self._style | TBS_LEFT
+	            case TicPosition.BothSide then self._style = self._style | TBS_BOTH
+	        end
+	    else
+	        switch self.ticPosition do
+	            case TicPosition.DownSide then self._style = self._style | TBS_BOTTOM
+	            case TicPosition.UpSide then self._style = self._style | TBS_TOP
+	            case TicPosition.BothSide then self._style = self._style | TBS_BOTH
+	        end
+	    end
+
+	    if self.selectionRange then 
+	    	self._style = self._style | TBS_ENABLESELRANGE
+	    	self._chnFlag = BF_RECT | BF_ADJUST | BF_FLAT
+	    end
+	    if self.reversed then self._style = self._style | TBS_REVERSED end
+	    if self.noTics then self._style = self._style | TBS_NOTICKS end
+	    if self.noThumb then self._style = self._style | TBS_NOTHUMB end
+	    if self.toolTip then self._style = self._style | TBS_TOOLTIPS end
+	    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	end
+
+
+	function TrackBar:prepareCustDraw()
+	    self._chnPen = CreatePen(PS_SOLID, 1, self.channelColor.ref)
+	    self._ticPen = CreatePen(PS_SOLID, self.ticWidth, self.ticColor.ref)
+	end
+
+	function TrackBar:sendInitialMessages()
+	    if self.reversed then
+	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.maxRange * -1)) 
+	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.minRange) 
+	    else
+	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.minRange)) 
+	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.maxRange) 
+	    end
+	    SendMessageW(self.handle, TBM_SETTICFREQ, self.frequency, 0) 
+	    SendMessageW(self.handle, TBM_SETPAGESIZE, 0, self.pageSize) 
+	    SendMessageW(self.handle, TBM_SETLINESIZE, 0, self.lineSize) 
+	end
+
+	function TrackBar:calculateTics()
+		-- Calculating logical & physical positions for tics.
+	    local twidth, numTics, stPos, enPos, channelLen, tic : integer
+	    local pFactor, range : number
+
+	    --1. Collecting required rects
+	    GetClientRect(self.handle, &self._myRect); -- Get Trackbar rect
+	    SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&self._thumbRect)) -- Get the thumb rect
+	    SendMessageW(self.handle, TBM_GETCHANNELRECT, 0, (@LPARAM)(&self._chnRect)) -- Get the channel rect
+
+	    --2. Calculate thumb offset
+	    if self.vertical then
+	        twidth = self._thumbRect.bottom - self._thumbRect.top
+	    else
+	        twidth = self._thumbRect.right - self._thumbRect.left
+	    end
+
+	    self._thumbHalf = (@integer)(twidth / 2)
+
+	    -- Now calculate required variables
+	    range = self.maxRange - self.minRange
+	    numTics = (@integer)(range / self.frequency)
+	    if (range % self.frequency) == 0 then numTics = numTics - 1 end
+	    stPos = self._chnRect.left + self._thumbHalf
+	    enPos = self._chnRect.right - self._thumbHalf - 1
+	    channelLen = enPos - stPos
+	    pFactor = channelLen / range
+
+	    tic = self.minRange + self.frequency
+	    self._ticList:push(TicData{stPos, 0}) -- Very first tic
+	    for i = 0, < numTics do
+	        self._ticList:push(TicData{(@integer)((tic * pFactor) + stPos), tic}) -- Middle tics
+	        tic = tic + self.frequency
+	    end
+	    self._ticList:push(TicData{enPos, (@integer)(range)}) -- Last tic
+
+	    -- Now, set up single point (x/y) for tics.
+	    if self.vertical then
+	        switch self.ticPosition do
+	            case TicPosition.LeftSide then self._p1 = self._thumbRect.left - 5
+	            case TicPosition.RightSide then self._p1 = self._thumbRect.right + 2
+	            case TicPosition.BothSide then
+	                self._p1 = self._thumbRect.right + 2
+	                self._p2 = self._thumbRect.left - 5
+	        end
+	    else
+	        switch self.ticPosition do
+	            case TicPosition.DownSide then self._p1 = self._thumbRect.bottom + 1
+	            case TicPosition.UpSide then self._p1 = self._thumbRect.top - 4
+	            case TicPosition.BothSide then
+	                self._p1 = self._thumbRect.bottom + 1
+	                self._p2 = self._thumbRect.top - 3
+	        end
+	    end
+	end
+--End of private funcs
+
+-- Public function
+function TrackBar:createHandle()
+	self:setTkStyle()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), tkWndProc)
+        if self.customDraw then self:prepareCustDraw() end
+        self:sendInitialMessages()
+        if self.customDraw then self:calculateTics() end
+        if self.selectionRange then
+        	self._selBrush = CreateSolidBrush(self.selectionColor.ref)
+        end		
+	end
+end
+
+-- function TrackBar:setText(txt: string)
+-- 	self.text = txt
+-- 	if self._isCreated then	setControlText(self.handle, txt) end
+-- end
+
+-- function TrackBar:getText(txt: string): string
+-- 	if self._isCreated then
+-- 		local wstr = getControlText(self.handle)
+-- 		self.text = toUTF8(wstr)
+-- 		return self.text
+-- 	else
+-- 		return self.text
+-- 	end
+-- end
+
+-- function TrackBar:showSelection(clr: uinteger)
+-- 	self.foreColor = Color.new(clr)
+-- 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
+-- 	invalidateNow(self)
+-- end
+
+function TrackBar:setupValueInternal(iValue: integer)
+	if self.reversed then
+        self.value = U16_MAX - iValue
+    else
+       	self.value = iValue
+    end
+end
+
+function TrackBar:drawVerticalTics(hdc: HDC, px: integer, py: integer)
+	MoveToEx(hdc, px, py, nilptr)
+    LineTo(hdc, px + self.ticLength, py)
+end
+
+function TrackBar:drawHorizontalTicsDown(hdc: HDC, px: integer, py: integer)
+	MoveToEx(hdc, px, py, nilptr)
+    LineTo(hdc, px, py + self.ticLength)
+end
+
+function TrackBar:drawHorizontalTicsUpper(hdc: HDC, px: integer, py: integer)
+	MoveToEx(hdc, px, py, nilptr)
+    LineTo(hdc, px, py - self.ticLength)
+end
+
+function TrackBar:drawTics(hdc: HDC)
+	SelectObject(hdc, self._ticPen)
+    if self.vertical then
+        switch self.ticPosition do
+        case TicPosition.RightSide, TicPosition.LeftSide then
+            for _,p in ipairs(self._ticList) do 
+            	self:drawVerticalTics(hdc, self._p1, p.phyPoint) 
+            end
+        case TicPosition.BothSide then
+            for _,p in ipairs(self._ticList) do
+                self:drawVerticalTics(hdc, self._p1, p.phyPoint)
+                self:drawVerticalTics(hdc, self._p2, p.phyPoint)
+            end
+       	end
+
+    else
+        switch self.ticPosition do
+        case TicPosition.UpSide, TicPosition.DownSide then
+            for _,p in ipairs(self._ticList) do
+            	self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
+            end
+        case TicPosition.BothSide then
+            for _,p in ipairs(self._ticList) do
+                self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
+                self:drawHorizontalTicsUpper(hdc, p.phyPoint, self._p2)
+            end
+    	end
+    end
+end
+
+function TrackBar:getThumbRect()
+	local rct : RECT
+	SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&rct))
+	return rct
+end
+
+function TrackBar:fillChannelRect(nm: LPNMCUSTOMDRAW, trc: RECT): boolean
+	--[[  If show_selection property is enabled in this trackbar,
+        we need to show the area between thumb and channel starting in diff color.
+        But we need to check if the trackbar is reversed or not.
+        NOTE: If we change the drawing flags for DrawEdge function in channel drawing area,
+        We need to reduce the rect size 1 point. Because, current flags working perfectly...
+        Without adsting rect. So change it carefully. ]]--
+    local result = false
+    local rct: RECT
+    if self.vertical then
+        rct.left = nm.rc.left
+        rct.right = nm.rc.right
+        if self.reversed then
+            rct.top = trc.bottom
+            rct.bottom = nm.rc.bottom
+        else
+            rct.top = nm.rc.top
+            rct.bottom = trc.top
+        end
+    else
+        rct.top = nm.rc.top
+        rct.bottom = nm.rc.bottom
+        if self.reversed then
+            rct.left = trc.right
+            rct.right = nm.rc.right
+        else
+            rct.left = nm.rc.left
+            rct.right = trc.left
+        end
+    end
+    result = FillRect(nm.hdc, &rct, self._selBrush) == 1 and true or false
+    return result
+end
+
+function TrackBar:destroy()
+	DeleteObject(self._bkBrush)
+	if self._selBrush ~= nilptr then DeleteObject(self._selBrush) end
+	if self._chnPen ~= nilptr then DeleteObject(self._chnPen) end
+	if self._ticPen ~= nilptr then DeleteObject(self._ticPen) end
+	print("TrackBar destroyed")
+end
+
+function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*TrackBar)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, tkWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)
+
+	case MM_HSCROLL, MM_VSCROLL then
+		local lwp = loWord(wpm)
+        switch lwp do
+        case TB_THUMBPOSITION then
+            this:setupValueInternal((@integer)(hiWord(wpm)))
+            if this.freeMove == false then
+                local pos: integer = this.value
+                local half: number = this.frequency / 2
+                local diff = pos % this.frequency
+                if diff >= half then
+                    pos = (this.frequency - diff) + this.value
+                elseif diff < half then
+                    pos =  this.value - diff
+                end
+
+                if this.reversed then
+                    SendMessageW(hw, TBM_SETPOS, 1, (pos * -1))
+                else
+                    SendMessageW(hw, TBM_SETPOS, 1, pos)
+                end
+                this.value = pos
+            end
+
+            -- We need to refresh Trackbar in order to display our new drawings.
+            InvalidateRect(hw, &this._chnRect, 0)
+            this.trackChange = TrackChange.MouseDrag
+            if this.onDragged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onDragged(this, &ea)
+            end
+
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+            end
+       
+        case THUMB_LINE_HIGH then
+            this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
+            this.trackChange = TrackChange.ArrowHigh
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+            end
+
+        case THUMB_LINE_LOW then
+            this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
+            this.trackChange = TrackChange.ArrowLow
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+            end
+       
+        case THUMB_PAGE_HIGH then
+            this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
+            this.trackChange = TrackChange.PageHigh
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+        	end
+
+        case THUMB_PAGE_LOW then
+            this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
+            this.trackChange = TrackChange.PageLow
+            if this.onValueChanged ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onValueChanged(this, &ea)
+        	end
+
+        case TB_THUMBTRACK then
+            this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
+            if this.onDragging ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onDragging(this, &ea)
+           	end
+        end
+
+    case MM_NOTIFY_REFLECT then
+        local nmh = (@LPNMHDR)(lpm)
+    	switch nmh.code do
+        case NM_CUSTOMDRAW then
+            if this.customDraw then
+                local nmcd = (@LPNMCUSTOMDRAW)(lpm)
+                if nmcd.dwDrawStage == CDDS_PREPAINT then return CDRF_NOTIFYITEMDRAW end
+                if nmcd.dwDrawStage ==  CDDS_ITEMPREPAINT then
+                    if nmcd.dwItemSpec == TBCD_TICS then
+                        if not this.noTics then
+                            this:drawTics(nmcd.hdc)
+                            return CDRF_SKIPDEFAULT
+                        end
+                    end
+                    if nmcd.dwItemSpec == TBCD_CHANNEL then
+                        --[[ Python proect is using EDGE_SUNKEN style without BF_FLAT.
+                        But D gives a strange outline in those flags. So I decided to use...
+                        these flags. But in this case, we don't need to reduce 1 point from...
+                        the coloring rect. It looks perfect without changing rect. ]]--
+                        if this.channelStyle == ChannelStyle.Classic then
+                            DrawEdge(nmcd.hdc, &nmcd.rc, BDR_SUNKENOUTER, this._chnFlag)
+                        else
+                            SelectObject(nmcd.hdc, this._chnPen)
+                            Rectangle(nmcd.hdc, nmcd.rc.left, nmcd.rc.top, nmcd.rc.right, nmcd.rc.bottom )
+                        end
+
+                        if this.selectionRange then -- Fill the selection range
+                            local rc = this:getThumbRect()
+                            if this:fillChannelRect(nmcd, rc) then InvalidateRect(hw, &nmcd.rc, 0) end
+                        end
+                        return CDRF_SKIPDEFAULT
+                    end
+                end
+            else
+            	return CDRF_DODEFAULT
+            end
+        case 4294967280 then -- con.TRBN_THUMBPOSCHANGING:
+            this.trackChange = TrackChange.MouseClick
+        end
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
