@@ -1,0 +1,442 @@
+
+
+-- TreeView module - Created on 19-Mar-2023 08:32 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local TV_FIRST <comptime> = 0x1100
+	local TVS_HASBUTTONS <comptime> = 0x0001
+	local TVS_HASLINES <comptime> = 0x0002
+	local TVS_LINESATROOT <comptime> = 0x0004
+	local TVS_EDITLABELS <comptime> = 0x0008
+	local TVS_DISABLEDRAGDROP <comptime> = 0x0010
+	local TVS_SHOWSELALWAYS <comptime> = 0x0020
+	local TVS_RTLREADING <comptime> = 0x0040
+	local TVS_NOTOOLTIPS <comptime> = 0x0080
+	local TVS_CHECKBOXES <comptime> = 0x0100
+	local TVS_TRACKSELECT <comptime> = 0x0200
+	local TVS_SINGLEEXPAND <comptime> = 0x0400
+	local TVS_INFOTIP <comptime> = 0x0800
+	local TVS_FULLROWSELECT <comptime> = 0x1000
+	local TVS_NOSCROLL <comptime> = 0x2000
+	local TVS_NONEVENHEIGHT <comptime> = 0x4000
+	local TVS_NOHSCROLL <comptime> = 0x8000 -- TVS_NOSCROLL overrides this
+	local TVS_EX_NOSINGLECOLLAPSE <comptime> = 0x0001
+	local TVS_EX_MULTISELECT <comptime> = 0x0002
+	local TVS_EX_DOUBLEBUFFER <comptime> = 0x0004
+	local TVS_EX_NOINDENTSTATE <comptime> = 0x0008
+	local TVS_EX_RICHTOOLTIP <comptime> = 0x0010
+	local TVS_EX_AUTOHSCROLL <comptime> = 0x0020
+	local TVS_EX_FADEINOUTEXPANDOS <comptime> = 0x0040
+	local TVS_EX_PARTIALCHECKBOXES <comptime> = 0x0080
+	local TVS_EX_EXCLUSIONCHECKBOXES <comptime> = 0x0100
+	local TVS_EX_DIMMEDCHECKBOXES <comptime> = 0x0200
+	local TVS_EX_DRAWIMAGEASYNC <comptime> = 0x0400
+
+	local TVIF_TEXT <comptime> = 0x0001
+	local TVIF_IMAGE <comptime> = 0x0002
+	local TVIF_PARAM <comptime> = 0x0004
+	local TVIF_STATE <comptime> = 0x0008
+	local TVIF_SELECTEDIMAGE <comptime> = 0x0020
+
+	local TVIS_SELECTED <comptime> = 0x0002
+	local TVIS_CUT <comptime> = 0x0004
+	local TVIS_DROPHILITED <comptime> = 0x0008
+	local TVIS_BOLD <comptime> = 0x0010
+	local TVIS_EXPANDED <comptime> = 0x0020
+	local TVIS_EXPANDEDONCE <comptime> = 0x0040
+	local TVIS_EXPANDPARTIAL <comptime> = 0x0080
+	local TVIS_OVERLAYMASK <comptime> = 0x0F00
+	local TVIS_STATEIMAGEMASK <comptime> = 0xF000
+	local TVIS_USERMASK <comptime> = 0xF000
+	local TVIS_EX_FLAT <comptime> = 0x0001
+	local TVIS_EX_DISABLED <comptime> = 0x0002
+	local TVIS_EX_ALL <comptime> = 0x0002
+
+	local TVI_ROOT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x10000))--(ULONG_MAX-0x10000)
+	local TVI_FIRST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFF)) --(ULONG_MAX-0x0FFFF)
+	local TVI_LAST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFE))
+	local TVI_SORT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFD))
+
+	local TV_FIRST <comptime> = 0x1100
+	local TVM_DELETEITEM <comptime> = (TV_FIRST + 1)
+	local TVM_SETIMAGELIST <comptime> = (TV_FIRST + 9)
+	local TVM_SETBKCOLOR <comptime> = (TV_FIRST + 29)
+	local TVM_SETTEXTCOLOR <comptime> = (TV_FIRST + 30)
+	local TVM_SETLINECOLOR <comptime> = (TV_FIRST + 40)
+	local TVM_INSERTITEMW <comptime> = (TV_FIRST + 50)
+--End
+
+local tvStyle <comptime> = WS_BORDER|WS_CHILD|WS_VISIBLE|TVS_HASLINES|TVS_HASBUTTONS|TVS_LINESATROOT|TVS_DISABLEDRAGDROP
+local tvNumber = 1
+local function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+global NodeOps = @enum {AddNode = 0, InsertNode, AddChild, InsertChild }
+-- global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
+-- global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
+
+global TreeNode = @record {
+	handle: HTREEITEM,
+	treeHwnd: HWND,
+	parentNode: *TreeNode,
+	imageIndex: integer,
+	selImageIndex: integer,
+	childCount: integer,
+	index: integer,
+	nodeCount: integer,
+	nodeID: integer,
+	checked: boolean,	
+	_isCreated: boolean,
+	foreColor: Color,
+	backColor: Color,
+	text: string,
+	nodes: vector(TreeNode),
+}
+
+global TreeView = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,	
+
+	--TreeView's own properties
+	lineColor: Color,
+	noLine: boolean,
+    noButton: boolean,
+	hasCheckBox: boolean,
+	fullRowSelect: boolean,
+	isEditable: boolean,
+	showSelection: boolean,
+	hotTrack: boolean,
+	nodeCount: integer,
+	selectedNode: TreeNode,
+	nodes: vector(TreeNode),	
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _uniqNodeID: integer,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,	
+}
+
+-- Public Constructor
+function TreeView.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : TreeView
+	local this : TreeView
+	this.name = string.format("TreeView_%d", tvNumber)
+	this.className = toUTF16("SysTreeView32")
+	this.width = w == 0 and 150 or w
+	this.height = h == 0 and 100 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = tvStyle
+	this._exStyle = 0
+	this.backColor = colorWhite
+	this.foreColor = colorBlack   
+    this.lineColor = colorBlack    
+    print("TVI_ROOT   lll  ", TVI_ROOT)
+    tvNumber = tvNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+function TreeNode.new(txt: string): *TreeNode
+	local this: *TreeNode = default_allocator:new(@TreeNode)
+	this.imageIndex = -1
+	this.selImageIndex = -1
+	this.foreColor = colorBlack
+	this.backColor = colorWhite
+	this.text = txt
+	return this
+end
+
+function TreeNode.fillData(nodePtr: *TreeNode, txt: string)
+	nodePtr.imageIndex = -1
+	nodePtr.selImageIndex = -1
+	nodePtr.foreColor = colorBlack
+	nodePtr.backColor = colorWhite
+	nodePtr.text = txt
+end
+
+-- Private functions
+	function TreeView:setTVStyle()
+		if self.noLine then self._style = self._style ~ TVS_HASLINES end
+        if self.noButton then self._style = self._style ~ TVS_HASBUTTONS end
+        if self.hasCheckBox then self._style = self._style | TVS_CHECKBOXES end
+        if self.fullRowSelect then self._style = self._style | TVS_FULLROWSELECT end
+        if self.isEditable then self._style = self._style | TVS_EDITLABELS end
+        if self.showSelection then self._style = self._style | TVS_SHOWSELALWAYS end
+        if self.hotTrack then self._style = self._style | TVS_TRACKSELECT end
+        if self.noButton and self.noLine then self._style = self._style ~ TVS_LINESATROOT end
+	    self._bkBrush = CreateSolidBrush(self.backColor.ref)
+	end
+
+	function TreeView:sendInitialMessages()
+	    if self.backColor.value ~= 0xFFFFFF then
+	    	SendMessageW(self.handle, TVM_SETBKCOLOR, 0, (@LPARAM)(self.backColor.ref))
+	    end
+        if self.foreColor.value ~= colorBlack.value then
+        	SendMessageW(self.handle, TVM_SETTEXTCOLOR, 0, (@LPARAM)(self.foreColor.ref))
+        end
+        if self.lineColor.value ~= colorBlack.value then
+        	SendMessageW(self.handle, TVM_SETLINECOLOR, 0, (@LPARAM)(self.lineColor.ref))
+        end	     
+	end
+
+	-- function TreeView:calculateTics()
+	-- 	-- Calculating logical & physical positions for tics.
+	--     local twidth, numTics, stPos, enPos, channelLen, tic : integer
+	--     local pFactor, range : number
+
+	--     --1. Collecting required rects
+	--     GetClientRect(self.handle, &self._myRect); -- Get TreeView rect
+	--     SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&self._thumbRect)) -- Get the thumb rect
+	--     SendMessageW(self.handle, TBM_GETCHANNELRECT, 0, (@LPARAM)(&self._chnRect)) -- Get the channel rect
+
+	--     --2. Calculate thumb offset
+	--     if self.vertical then
+	--         twidth = self._thumbRect.bottom - self._thumbRect.top
+	--     else
+	--         twidth = self._thumbRect.right - self._thumbRect.left
+	--     end
+
+	--     self._thumbHalf = (@integer)(twidth / 2)
+
+	--     -- Now calculate required variables
+	--     range = self.maxRange - self.minRange
+	--     numTics = (@integer)(range / self.frequency)
+	--     if (range % self.frequency) == 0 then numTics = numTics - 1 end
+	--     stPos = self._chnRect.left + self._thumbHalf
+	--     enPos = self._chnRect.right - self._thumbHalf - 1
+	--     channelLen = enPos - stPos
+	--     pFactor = channelLen / range
+
+	--     tic = self.minRange + self.frequency
+	--     self._ticList:push(TicData{stPos, 0}) -- Very first tic
+	--     for i = 0, < numTics do
+	--         self._ticList:push(TicData{(@integer)((tic * pFactor) + stPos), tic}) -- Middle tics
+	--         tic = tic + self.frequency
+	--     end
+	--     self._ticList:push(TicData{enPos, (@integer)(range)}) -- Last tic
+
+	--     -- Now, set up single point (x/y) for tics.
+	--     if self.vertical then
+	--         switch self.ticPosition do
+	--             case TicPosition.LeftSide then self._p1 = self._thumbRect.left - 5
+	--             case TicPosition.RightSide then self._p1 = self._thumbRect.right + 2
+	--             case TicPosition.BothSide then
+	--                 self._p1 = self._thumbRect.right + 2
+	--                 self._p2 = self._thumbRect.left - 5
+	--         end
+	--     else
+	--         switch self.ticPosition do
+	--             case TicPosition.DownSide then self._p1 = self._thumbRect.bottom + 1
+	--             case TicPosition.UpSide then self._p1 = self._thumbRect.top - 4
+	--             case TicPosition.BothSide then
+	--                 self._p1 = self._thumbRect.bottom + 1
+	--                 self._p2 = self._thumbRect.top - 3
+	--         end
+	--     end
+	-- end
+--End of private funcs
+
+-- Public function
+function TreeView:createHandle()
+	self:setTVStyle()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), tvWndProc)
+        self:sendInitialMessages()
+	end
+end
+
+local function makeTVInsertStruct(node: *TreeNode) : TVINSERTSTRUCTW
+	local tvi: TVITEMEXW
+	tvi.mask = TVIF_TEXT | TVIF_PARAM
+    tvi.pszText = (@LPWSTR)(toUTF16(node.text))
+    tvi.cchTextMax = #node.text
+    tvi.iImage = node.imageIndex
+    tvi.iSelectedImage = node.selImageIndex
+    tvi.stateMask = TVIS_USERMASK
+    if node.imageIndex > -1 then tvi.mask = tvi.mask | TVIF_IMAGE end
+    if node.selImageIndex > -1 then tvi.mask = tvi.mask | TVIF_SELECTEDIMAGE end
+	local tIns: TVINSERTSTRUCTW
+	tIns.itemex = tvi
+	tIns.itemex.lParam = (@LPARAM)((@pointer)(node))
+	return tIns
+end
+
+function TreeView:addNodeInernal(nop: NodeOps, node: *TreeNode, pnode: *TreeNode, pos: integer)
+	if not self._isCreated then return end
+    node._isCreated = true
+    -- node.mNotifyHandler = &(this.nodeNotifyHandler);
+    node.treeHwnd = self.handle
+    node.index = self.nodeCount
+    node.nodeID = self._uniqNodeID --We can identify any node with self
+
+    local tis = makeTVInsertStruct(node)
+    local isRootNode = false
+    local errMsg = "Can't Add"
+
+    switch nop do
+    case NodeOps.AddNode then
+        tis.hParent = TVI_ROOT
+        tis.hInsertAfter = self.nodeCount > 0 and self.nodes[self.nodeCount - 1].handle or TVI_FIRST
+        isRootNode = true   
+
+    case NodeOps.InsertNode then
+        tis.hParent = TVI_ROOT
+        tis.hInsertAfter = pos == 0 and TVI_FIRST or self.nodes[pos - 1].handle
+        isRootNode = true
+        errMsg = "Can't Insert"
+
+    case NodeOps.AddChild then
+        tis.hInsertAfter = TVI_LAST
+        tis.hParent = pnode.handle
+        node.parentNode = pnode 
+        errMsg = "Can't Add Child"
+   
+    case NodeOps.InsertChild then
+        tis.hParent = pnode.handle
+        tis.hInsertAfter = pos == 0 and TVI_FIRST or pnode.nodes[pos - 1].handle
+        node.parentNode = pnode
+        errMsg = "Can't Insert Child"
+   	end
+
+    local hItem =  (@HTREEITEM)(SendMessageW(self.handle, TVM_INSERTITEMW, 0, (@LPARAM)(&tis)))
+    if hItem ~= nilptr then
+        node.handle = hItem
+        self._uniqNodeID = self._uniqNodeID + 1
+        if isRootNode then
+            self.nodes:push($node)
+            self.nodeCount = self.nodeCount + 1
+        else
+            pnode.nodes:push($node)
+            pnode.nodeCount = pnode.nodeCount + 1
+        end
+    else
+        print(string.format("%s node!, Error - %d", errMsg, GetLastError()))
+    end
+end
+
+function TreeView:addNode(txt: string): *TreeNode
+	local node: *TreeNode = TreeNode.new(txt)
+	self:addNodeInernal(NodeOps.AddNode, node, nilptr, -1)
+	return node
+end
+
+function TreeView:addNodeEx(nodePtr: *TreeNode)
+	self:addNodeInernal(NodeOps.AddNode, nodePtr, nilptr, -1)
+end
+
+function TreeView:addChildNode(txt: string, parentNode: *TreeNode) : *TreeNode
+	local node: *TreeNode = TreeNode.new(txt)
+	self:addNodeInernal(NodeOps.AddChild, node, parentNode, -1)
+	return node
+end
+
+
+function TreeView:destroy()
+	DeleteObject(self._bkBrush)
+	
+	print("TreeView destroyed")
+end
+
+function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*TreeView)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, tvWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)
+
+	
+
+    -- case MM_NOTIFY_REFLECT then
+    --     local nmh = (@LPNMHDR)(lpm)
+    -- 	switch nmh.code do
+    --     case NM_CUSTOMDRAW then
+    --         if this.customDraw then
+    --             local nmcd = (@LPNMCUSTOMDRAW)(lpm)
+    --             if nmcd.dwDrawStage == CDDS_PREPAINT then return CDRF_NOTIFYITEMDRAW end
+    --             if nmcd.dwDrawStage ==  CDDS_ITEMPREPAINT then
+    --                 if nmcd.dwItemSpec == TBCD_TICS then
+    --                     if not this.noTics then
+    --                         this:drawTics(nmcd.hdc)
+    --                         return CDRF_SKIPDEFAULT
+    --                     end
+    --                 end
+    --                 if nmcd.dwItemSpec == TBCD_CHANNEL then
+    --                     --[[ Python proect is using EDGE_SUNKEN style without BF_FLAT.
+    --                     But D gives a strange outline in those flags. So I decided to use...
+    --                     these flags. But in this case, we don't need to reduce 1 point from...
+    --                     the coloring rect. It looks perfect without changing rect. ]]--
+    --                     if this.channelStyle == ChannelStyle.Classic then
+    --                         DrawEdge(nmcd.hdc, &nmcd.rc, BDR_SUNKENOUTER, this._chnFlag)
+    --                     else
+    --                         SelectObject(nmcd.hdc, this._chnPen)
+    --                         Rectangle(nmcd.hdc, nmcd.rc.left, nmcd.rc.top, nmcd.rc.right, nmcd.rc.bottom )
+    --                     end
+
+    --                     if this.selectionRange then -- Fill the selection range
+    --                         local rc = this:getThumbRect()
+    --                         if this:fillChannelRect(nmcd, rc) then InvalidateRect(hw, &nmcd.rc, 0) end
+    --                     end
+    --                     return CDRF_SKIPDEFAULT
+    --                 end
+    --             end
+    --         else
+    --         	return CDRF_DODEFAULT
+    --         end
+    --     case 4294967280 then -- con.TRBN_THUMBPOSCHANGING:
+    --         this.trackChange = TrackChange.MouseClick
+    --     end
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
