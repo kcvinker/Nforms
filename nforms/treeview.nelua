@@ -169,19 +169,20 @@ function TreeView.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this.backColor = colorWhite
 	this.foreColor = colorBlack   
     this.lineColor = colorBlack    
-    print("TVI_ROOT   lll  ", TVI_ROOT)
+    this._uniqNodeID = 100
     tvNumber = tvNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
-function TreeNode.new(txt: string): *TreeNode
+function TreeNode.new(txt: string, img: integer, selImg: integer): *TreeNode
 	local this: *TreeNode = default_allocator:new(@TreeNode)
-	this.imageIndex = -1
-	this.selImageIndex = -1
+	this.imageIndex = img == 0 and -1 or img
+	this.selImageIndex = selImg == 0 and -1 or selImg
 	this.foreColor = colorBlack
 	this.backColor = colorWhite
 	this.text = txt
+	this.index = -1
 	return this
 end
 
@@ -370,10 +371,29 @@ function TreeView:addChildNode(txt: string, parentNode: *TreeNode) : *TreeNode
 	return node
 end
 
+function TreeView:insertNode(txt: string, index: integer) : *TreeNode
+	local node: *TreeNode = TreeNode.new(txt)
+	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
+	return node
+end
+
+function TreeView:insertNodeEx(node: *TreeNode, index: integer)
+	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
+end
+
+function TreeView:insertChildNode(txt: string, parentNode: *TreeNode, index: integer) : *TreeNode
+	local node: *TreeNode = TreeNode.new(txt)
+	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
+	return node
+end
+
+function TreeView:insertChildNodeEx(node: *TreeNode, parentNode: *TreeNode, index: integer)
+	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
+end
+
 
 function TreeView:destroy()
-	DeleteObject(self._bkBrush)
-	
+	DeleteObject(self._bkBrush)	
 	print("TreeView destroyed")
 end
 
@@ -393,9 +413,7 @@ function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)
-
-	
+	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)	
 
     -- case MM_NOTIFY_REFLECT then
     --     local nmh = (@LPNMHDR)(lpm)
