@@ -1,0 +1,611 @@
+
+
+-- ListView module - Created on 21-Mar-2023 04:34 PM
+
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local LVM_FIRST <comptime> = 4096
+	local LVN_FIRST <comptime> = -100_cuint
+
+	local LVS_ICON <comptime> = 0x0000
+	local LVS_REPORT <comptime> = 0x0001
+	local LVS_SMALLICON <comptime> = 0x0002
+	local LVS_LIST <comptime> = 0x0003
+	local LVS_SHOWSELALWAYS <comptime> = 0x0008
+	local LVS_EDITLABELS <comptime> = 0x0200
+	local LVS_ALIGNLEFT <comptime> = 0x0800
+	local LVS_NOCOLUMNHEADER <comptime> = 0x4000
+	local LVS_SINGLESEL <comptime> = 0x0004
+
+	local LVS_EX_GRIDLINES <comptime> = 0x00000001
+	local LVS_EX_CHECKBOXES <comptime> = 0x00000004
+	local LVS_EX_TRACKSELECT <comptime> = 0x00000008
+	local LVS_EX_FULLROWSELECT <comptime> = 0x00000020
+	local LVS_EX_ONECLICKACTIVATE <comptime> = 0x00000040
+
+	local LV_VIEW_ICON <comptime> = 0x0000
+	local LV_VIEW_DETAILS  <comptime> = 0x0001
+	local LV_VIEW_SMALLICON <comptime> = 0x0002
+	local LV_VIEW_LIST <comptime> = 0x0003
+	local LV_VIEW_TILE <comptime> = 0x0004
+	local LV_VIEW_MAX <comptime> = 0x0004
+
+	local LVCF_FMT <comptime> = 1
+	local LVCF_WIDTH <comptime> = 2
+	local LVCF_TEXT <comptime> = 4
+	local LVCF_SUBITEM <comptime> = 8
+	local LVCF_IMAGE <comptime> = 16
+	local LVCF_ORDER <comptime> = 32
+	local LVCFMT_LEFT <comptime> = 0
+	local LVCFMT_RIGHT <comptime> = 1
+	local LVCFMT_CENTER <comptime> = 2
+	local LVCFMT_JUSTIFYMASK <comptime> = 3
+	local LVCFMT_IMAGE <comptime> = 2048
+	local LVCFMT_BITMAP_ON_RIGHT <comptime> = 4096
+	local LVCFMT_COL_HAS_IMAGES <comptime> = 32768
+
+	local LVIF_TEXT <comptime> = 1
+	local LVIF_IMAGE <comptime> = 2
+	local LVIF_PARAM <comptime> = 4
+	local LVIF_STATE <comptime> = 8
+
+	local LVM_SETBKCOLOR <comptime> = (LVM_FIRST + 1)
+	local LVM_GETHEADER <comptime> = (LVM_FIRST + 31)
+	local LVM_SETEXTENDEDLISTVIEWSTYLE <comptime> = (LVM_FIRST + 54)
+	local LVM_SETCOLUMNORDERARRAY <comptime> = (LVM_FIRST + 58)
+	local LVM_INSERTITEMW <comptime> = (LVM_FIRST + 77)
+	local LVM_INSERTCOLUMNW <comptime> = (LVM_FIRST + 97)
+	local LVM_SETITEMTEXTW <comptime> = (LVM_FIRST + 116)
+
+	local LVN_ITEMCHANGED <comptime> = (LVN_FIRST-1)
+	local NM_CLICK <comptime> = (NM_FIRST-2)
+	local NM_DBLCLK <comptime> = (NM_FIRST-3)
+	local NM_HOVER <comptime> = (NM_FIRST-13)
+	
+	-- local TVIS_DROPHILITED <comptime> = 0x0008
+	-- local TVIS_BOLD <comptime> = 0x0010
+	-- local TVIS_EXPANDED <comptime> = 0x0020
+	-- local TVIS_EXPANDEDONCE <comptime> = 0x0040
+	-- local TVIS_EXPANDPARTIAL <comptime> = 0x0080
+	-- local TVIS_OVERLAYMASK <comptime> = 0x0F00
+	-- local TVIS_STATEIMAGEMASK <comptime> = 0xF000
+	-- local TVIS_USERMASK <comptime> = 0xF000
+	-- local TVIS_EX_FLAT <comptime> = 0x0001
+	-- local TVIS_EX_DISABLED <comptime> = 0x0002
+	-- local TVIS_EX_ALL <comptime> = 0x0002
+
+	-- local TVI_ROOT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x10000))--(ULONG_MAX-0x10000)
+	-- local TVI_FIRST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFF)) --(ULONG_MAX-0x0FFFF)
+	-- local TVI_LAST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFE))
+	-- local TVI_SORT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFD))
+
+	-- local TV_FIRST <comptime> = 0x1100
+	-- local TVM_DELETEITEM <comptime> = (TV_FIRST + 1)
+	-- local TVM_SETIMAGELIST <comptime> = (TV_FIRST + 9)
+	-- local TVM_SETBKCOLOR <comptime> = (TV_FIRST + 29)
+	-- local TVM_SETTEXTCOLOR <comptime> = (TV_FIRST + 30)
+	-- local TVM_SETLINECOLOR <comptime> = (TV_FIRST + 40)
+	-- local TVM_INSERTITEMW <comptime> = (TV_FIRST + 50)
+--End
+
+local lvStyle <comptime> = WS_VISIBLE|WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS|LVS_REPORT|WS_BORDER|LVS_ALIGNLEFT|LVS_SINGLESEL
+local lvNumber = 1
+local function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+local function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+global ListViewStyle = @enum {LargeIcon = 0, ReportView, SmallIcon, ListView, TileView }
+-- global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
+-- global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
+
+global ListViewColumn = @record {
+	--Public props
+	text: string,
+	width: integer,
+	index: integer,
+	imageIndex: integer,
+	imageOnRight: boolean,
+	hasImage: boolean,
+	textAlign: TextAlign,
+	headerTextAlign: TextAlign,	
+	backColor: Color,
+	foreColor: Color,
+
+	--Private props
+	_drawNeeded: boolean,
+	_isHotItem: boolean,
+	_order: integer,
+	_hdrTxtFlag: DWORD,
+	_lvc: *LVCOLUMNW,
+}
+
+global ListViewItem = @record {
+	text: string,
+	index: integer,
+	imageIndex: integer,
+	backColor: Color,
+	foreColor: Color,
+	font: Font,
+	subItems: vector(string),
+}
+
+global ListView = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,	
+
+	--ListView's own properties
+	selectedIndex: integer,
+	selectdeSubIndex: integer,
+	headerHeight: integer,
+    editLabel: boolean,
+	hideSelection: boolean,
+	multiSelection: boolean,
+	hasCheckBox: boolean,
+	fullRowSelect: boolean,
+	showGrid: boolean,
+	oneClickActivate: boolean,
+	hotTrackSelection: boolean,
+	noHeader: boolean,
+	headerClickable: boolean,
+	checkBoxLast: boolean,
+	checked: boolean,
+	headerBackColor: Color,
+	headerForeColor: Color,
+	headerFont: Font,
+	selectedItem: ListViewItem,
+	viewStyle: ListViewStyle,
+	columns: vector(*ListViewColumn),
+	items: vector(*ListViewItem),
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+
+	_hdrHotBrush: HBRUSH,
+	_hdrBkBrush: HBRUSH,
+	_hdrPen: HPEN,
+    _colIndex: integer,
+    _rowIndex: integer,
+    _itemIndex: integer,
+    _layoutCount: integer,
+    _hotHdrIndex: integer,
+    _hdrHwnd: HWND,
+    _changeHdrHeight: boolean,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,	
+	onCheckedChanged: EventHandler,
+	onSelectionChanged: EventHandler,
+	onItemDoubleClicked: EventHandler,
+	onItemClicked: EventHandler,
+	onItemHover: EventHandler,
+}
+
+-- Public Constructor
+function ListView.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ListView
+	local this : ListView
+	this.name = string.format("ListView_%d", lvNumber)
+	this.className = toUTF16("SysListView32")
+	this.width = w == 0 and 280 or w
+	this.height = h == 0 and 200 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this.cid = frm._cidNumber
+	this._style = lvStyle
+	this._exStyle = 0
+	this.backColor = colorWhite
+	this.foreColor = colorBlack 
+
+	this.viewStyle = ListViewStyle.ReportView
+	this.showGrid = true
+	this.fullRowSelect = true
+	this.hideSelection = true
+	this.oneClickActivate = true
+	this.headerClickable = true
+	this.headerHeight = 35
+	this._itemIndex = -1
+	this._hotHdrIndex = -1
+	this.headerBackColor = Color.new(0xdce1de) 
+	this.headerForeColor = Color.new(0x000000)
+    
+    lvNumber = lvNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+function ListViewColumn.new(txt: string, width: integer, ImgIndex: integer): *ListViewColumn
+	local this: *ListViewColumn = default_allocator:new(@ListViewColumn)
+	this.text = txt
+	this.width = width == 0 and 100 or width
+	this.imageIndex = ImgIndex == 0 and -1 or ImgIndex
+	this.imageOnRight = false
+	this.textAlign = TextAlign.Left
+	this.index = -1
+	this.headerTextAlign = TextAlign.Center
+	this._hdrTxtFlag = DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_NOPREFIX
+	return this
+end
+
+function ListViewItem.new(txt: string, bgColor: uinteger, fgColor: uinteger, imgIndex: integer): *ListViewItem
+	local this: *ListViewItem = default_allocator:new(@ListViewItem)
+	this.text = txt
+	this.backColor = bgColor == 0 and colorWhite or Color.new(bgColor)
+	this.foreColor = fgColor == 0 and colorBlack or Color.new(fgColor)
+	this.index = -1
+	this.imageIndex = imgIndex
+	return this	
+end
+
+-- Private functions
+	function ListView:setLVStyle()
+		switch self.viewStyle do
+            case ListViewStyle.LargeIcon then self._style = self._style | LVS_ICON
+            case ListViewStyle.ReportView then self._style = self._style | LVS_REPORT
+            case ListViewStyle.SmallIcon then self._style = self._style | LVS_SMALLICON
+            case ListViewStyle.ListView then self._style = self._style | LVS_LIST
+		end
+        if self.editLabel then self._style = self._style | LVS_EDITLABELS end
+        if self.noHeader then self._style = self._style | LVS_NOCOLUMNHEADER end
+        if self.hideSelection then self._style = self._style ~ LVS_SHOWSELALWAYS end
+        if self.multiSelection then self._style = self._style ~ LVS_SINGLESEL end
+        -- Set some brushes
+        self._hdrBkBrush = CreateSolidBrush(self.headerBackColor.ref)
+        self._hdrHotBrush = self.headerBackColor:getHotBrush(0.9)
+        self._hdrPen = CreatePen(PS_SOLID, 1, 0x00FFFFFF)
+	end
+
+	function ListView:setLVExStyles()
+	    local lvExStyle: DWORD = 0x0000
+        if self.showGrid then lvExStyle = lvExStyle | LVS_EX_GRIDLINES end
+        if self.hasCheckBox then lvExStyle = lvExStyle | LVS_EX_CHECKBOXES end
+        if self.fullRowSelect then lvExStyle = lvExStyle | LVS_EX_FULLROWSELECT end
+        if self.oneClickActivate then lvExStyle = lvExStyle | LVS_EX_ONECLICKACTIVATE end
+        if self.hotTrackSelection then lvExStyle = lvExStyle | LVS_EX_TRACKSELECT end
+        -- if (this.viewStyle == ListViewStyle.TileView then SendMessageW(self.handle, LVM_SETVIEW, 0x0004, 0) end
+        SendMessageW(self.handle, LVM_SETEXTENDEDLISTVIEWSTYLE, 0 , (@LPARAM)(lvExStyle))
+	end
+
+	function ListView:setHeaderSubclass()
+		self._hdrHwnd = (@HWND)(SendMessageW(self.handle, LVM_GETHEADER, 0, 0))
+		SetWindowSubclass(self._hdrHwnd, &hdrWndProc, subClassID, (@DWORD_PTR)(self))
+		subClassID = subClassID + 1
+	end
+
+	function ListView:postCreationTasks()
+		if self.backColor.value ~= colorWhite.value then
+			SendMessageW(self.handle, LVM_SETBKCOLOR, 0, (@LPARAM)(self.backColor.ref))
+		end
+		if self.checkBoxLast then			
+			local iVector: vector(integer)
+			iVector:reserve(#self.columns)
+			for _,col in ipairs(self.columns) do 
+				if col.index > 0 then iVector:push(col.index) end 
+			end
+			iVector:push(0)
+			SendMessageW(self.handle, LVM_SETCOLUMNORDERARRAY, #iVector, (@LPARAM)(&iVector[0]))
+		end
+	end
+--End of private funcs
+
+-- Public function
+function ListView:createHandle()
+	self:setLVStyle()
+	createControl(self)
+	if self._isCreated then
+		self:setLVExStyles()
+		setSubClass(self.handle, (pointer)(self), lvWndProc)
+        self:setHeaderSubclass()
+        self:postCreationTasks()
+	end
+end
+
+
+function ListView:addColumnInternal(lvCol: *ListViewColumn)
+	lvCol.index = self._colIndex 
+    local lvc: LVCOLUMNW
+    lvc.mask = LVCF_FMT | LVCF_TEXT  | LVCF_WIDTH  | LVCF_SUBITEM --| LVCF_ORDER
+    lvc.fmt = lvCol.textAlign
+    lvc.cx = lvCol.width
+    lvc.pszText = toUTF16(lvCol.text)
+    if lvCol.hasImage then
+        lvc.mask = lvc.mask | LVCF_IMAGE
+        lvc.fmt = lvc.fmt | LVCFMT_COL_HAS_IMAGES | LVCFMT_IMAGE
+        lvc.iImage = lvCol.imageIndex
+        if lvCol.imageOnRight then lvc.fmt = lvc.fmt | LVCFMT_BITMAP_ON_RIGHT end
+    end
+    lvCol._lvc = &lvc
+    if self._isCreated then
+        SendMessageW(self.handle, LVM_INSERTCOLUMNW, lvCol.index, (@LPARAM)(&lvc))
+    	-- We need self to do the painting in wm notify.
+       -- if (!self.mDrawColumns && lvCol.mDrawNeeded) self.mDrawColumns = true;
+    end
+    self.columns:push(lvCol)
+    self._colIndex = self._colIndex + 1
+end
+
+function ListView:addColumn(txt: string, width: integer)
+	local col: *ListViewColumn = ListViewColumn.new(txt, width)
+	self:addColumnInternal(col)
+end
+
+function ListView:addColumns(colNames: span(string), widths: span(integer))
+	for i,name in ipairs(colNames) do
+		local col: *ListViewColumn = ListViewColumn.new(name, widths[i])
+		self:addColumnInternal(col)
+	end
+end
+
+function ListView:addItemInternal(item: *ListViewItem)
+	item.index = self._rowIndex
+	local lvi: LVITEMW
+    lvi.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE
+    if item.imageIndex ~= -1 then lvi.mask = lvi.mask | LVIF_IMAGE end
+    lvi.state = 0
+    lvi.stateMask = 0
+    lvi.iItem = item.index
+    lvi.iSubItem = 0
+    lvi.iImage = item.imageIndex
+    lvi.pszText = toUTF16(item.text)
+    lvi.cchTextMax = #item.text
+    lvi.lParam = (@LPARAM)(item)
+    SendMessageW(self.handle, LVM_INSERTITEMW, 0, (@LPARAM)(&lvi))
+    self.items:push(item)
+    self._rowIndex = self._rowIndex + 1
+end
+
+function ListView:addSubItemInternal(sItem: string, itemIndex: integer, subIndx: integer, imgIndex: integer)
+	local lw: LVITEMW
+    lw.iSubItem = subIndx
+    -- auto x = sItem.toUTF16z;
+    lw.pszText = toUTF16(sItem)
+    lw.iImage = imgIndex
+    SendMessageW(self.handle, LVM_SETITEMTEXTW, itemIndex, (@LPARAM)(&lw))
+    self.items[itemIndex].subItems:push(sItem)
+end
+
+function ListView:addRows(... : varargs)
+	local args : vector(string)
+	## for i=1,select('#', ...) do
+		## local argnode = select(i, ...)
+    	## local argtype = argnode.attr.type
+    	## if not argtype.is_stringy then 
+    		args:push(tostring(#[argnode]#))
+    	## else
+    		args:push(#[argnode]#)
+    	## end
+    	
+	## end
+	local lvitem = ListViewItem.new(args[0])
+	self:addItemInternal(lvitem)	
+	for i = 1,<#args do
+		self:addSubItemInternal(args[i], lvitem.index, i, -1)
+	end
+end
+
+-- function ListView:insertNode(txt: string, index: integer) : *TreeNode
+-- 	local node: *TreeNode = TreeNode.new(txt)
+-- 	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
+-- 	return node
+-- end
+
+-- function ListView:insertNodeEx(node: *TreeNode, index: integer)
+-- 	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
+-- end
+
+-- function ListView:insertChildNode(txt: string, parentNode: *TreeNode, index: integer) : *TreeNode
+-- 	local node: *TreeNode = TreeNode.new(txt)
+-- 	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
+-- 	return node
+-- end
+
+function ListView:headerCustomDraw(nmcd: LPNMCUSTOMDRAW): LRESULT
+	local col = self.columns[nmcd.dwItemSpec]
+    SetBkMode(nmcd.hdc, 1)
+    if col.index > 0 then nmcd.rc.left = nmcd.rc.left + 1 end
+    if self.headerClickable then
+        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
+            -- Header is clicked. So we will change the back color.
+            FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+        else
+            if nmcd.dwItemSpec == self._hotHdrIndex then
+                -- Mouse pointer is on header. So we will change the back color.
+                FillRect(nmcd.hdc, &nmcd.rc, self._hdrHotBrush)
+            else
+                FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+            end
+        end
+        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
+            -- Here we are mimicing dot net's same technique.
+            -- We will change the rect's left and top a little bit when header got clicked.
+            -- So user will feel the header is pressed. */
+            nmcd.rc.left = nmcd.rc.left + 2
+            nmcd.rc.top = nmcd.rc.top + 2
+        end
+    else
+        FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+    end
+    -- Draw a white line on ther right side of the hdr
+    SelectObject(nmcd.hdc, self._hdrPen)
+    MoveToEx(nmcd.hdc, nmcd.rc.right, nmcd.rc.top, nilptr)
+    LineTo(nmcd.hdc, nmcd.rc.right, nmcd.rc.bottom)
+    SelectObject(nmcd.hdc, self.headerFont.handle)
+    SetTextColor(nmcd.hdc, self.headerForeColor.ref)
+    DrawTextW(nmcd.hdc, toUTF16(col.text), -1, &nmcd.rc, col._hdrTxtFlag)
+    return CDRF_SKIPDEFAULT
+end
+
+
+function ListView:destroy()
+	-- DeleteObject(self._bkBrush)	
+	print("ListView destroyed")
+end
+
+function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*ListView)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, lvWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)	
+
+    case MM_NOTIFY_REFLECT then
+        local nmh = (@LPNMHDR)(lpm)
+    	switch nmh.code do
+        case NM_CUSTOMDRAW then
+        	local nmLvcd = (@LPNMLVCUSTOMDRAW)(lpm)
+        	switch nmLvcd.nmcd.dwDrawStage do
+            case CDDS_PREPAINT then return CDRF_NOTIFYITEMDRAW
+            case CDDS_ITEMPREPAINT then
+                nmLvcd.clrTextBk = this.backColor.ref
+                return CDRF_NEWFONT | CDRF_DODEFAULT
+            end
+        case LVN_ITEMCHANGED then
+        	local nmlv = (@LPNMLISTVIEW)(lpm)
+            if nmlv.uNewState == 8192 or nmlv.uNewState == 4096 then
+                this.checked = nmlv.uNewState == 8192 and true or false
+                if this.onCheckedChanged ~= nilptr then
+                    local ea : EventArgs = {}
+                    this.onCheckedChanged(this, &ea)
+                end
+            else 
+                if nmlv.uNewState == 3 then
+                    --print("this area oka");
+                    this.selectedIndex = nmlv.iItem
+                    this.selectdeSubIndex = nmlv.iSubItem
+                    if this.onSelectionChanged ~= nilptr then
+                        local ea : EventArgs = {}
+                        this.onSelectionChanged(this, &ea)
+                    end
+                end
+            end
+        case NM_DBLCLK then
+	        if this.onItemDoubleClicked then
+	            local ea : EventArgs = {}
+	            this.onItemDoubleClicked(this, &ea)
+	        end
+
+	    case NM_CLICK then
+            local nmia = (@LPNMITEMACTIVATE)(lpm)
+            -- lv.log(nmia.uOldState);
+            if this.onItemClicked ~= nilptr then
+                local ea : EventArgs = {}
+                this.onItemClicked(this, &ea)
+            end
+        case NM_HOVER then                        
+	        if this.onItemHover ~= nilptr then
+	            local ea : EventArgs = {}
+	            this.onItemHover(this, &ea)
+	        end
+	    end
+    
+	case WM_NOTIFY then
+		local nmh = (@LPNMHDR)(lpm)
+        switch nmh.code do
+            case NM_CUSTOMDRAW then  -- Let's draw header back & fore colors
+                local nmcd = (@LPNMCUSTOMDRAW)(lpm)
+                switch nmcd.dwDrawStage do -- NM_CUSTOMDRAW is always -12 when item painting
+	                case CDDS_PREPAINT then return CDRF_NOTIFYITEMDRAW
+	                case CDDS_ITEMPREPAINT then
+	                    --[[ So we get the notification at the pre paint statge. We can draw the header...
+	                    colors, text and tell the system to not to draw anything on this header. So...
+	                    system will skip the default drawing jobs. ]]--
+	                    return this:headerCustomDraw(nmcd)
+                end
+        end
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
+
+
+
+function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*ListView)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, hdrWndProc, scID)
+	case WM_MOUSEMOVE then
+        --[[ We need to some extra job here. Because, there is no notification
+        for a header control when mouse pointer passes upon it. So We collect
+        the mouse pointer coordinates and send the HDM_HITTEST message to header
+        control. The control will fill the iItem member of the struct. It contains
+        the item index which is under the pointer. So we can set the drawing
+        flag for that column. ]]--
+        local hinfo: HDHITTESTINFO
+        hinfo.pt = getMousePos(lpm)
+        this._hotHdrIndex = (@integer)(SendMessageW(hw, HDM_HITTEST, 0, (@LPARAM)(&hinfo)))
+    case WM_MOUSELEAVE then this._hotHdrIndex = -1
+   	case HDM_LAYOUT then
+   		if this._changeHdrHeight then
+            local pHl = (@LPHDLAYOUT)(lpm)
+            pHl.pwpos.hwnd = hw
+            pHl.pwpos.flags = SWP_FRAMECHANGED
+            pHl.pwpos.x = pHl.prc.left
+            pHl.pwpos.y = 0
+            pHl.pwpos.cx = (pHl.prc.right - pHl.prc.left)
+            pHl.pwpos.cy = this.headerHeight
+            pHl.prc.top = this.headerHeight
+            return 1
+        end
+	case WM_PAINT then
+        -- We need to paint the last part of the header control. Otherwise,
+        -- it will look like a weird white color square and it's ugly unless,
+        -- we are using white color for header. */
+        -- First, let the control to do it's necessary drawings.
+        DefSubclassProc(hw, msg, wpm, lpm)
+        -- Now, we can draw the last part of the header.
+        local hrc: RECT
+        SendMessageW(hw, HDM_GETITEMRECT, #this.columns - 1, (@LPARAM)(&hrc))
+        local rc: RECT = RECT{hrc.right + 1, hrc.top, this.width, hrc.bottom}
+        local hdc: HDC = GetDC(hw)
+        FillRect(hdc, &rc, this._hdrBkBrush)
+        ReleaseDC(hw, hdc)
+        return 0
+	end
+
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
