@@ -46,8 +46,7 @@ local function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: U
 
 global ViewMode = @enum {month = 0, year, decade, centuary}
 
-global Calendar = @record
-{
+global Calendar = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -69,8 +68,6 @@ global Calendar = @record
     noToday : boolean,
     noTrailingDates : boolean,
     shortDayNames : boolean,
-
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -82,7 +79,6 @@ global Calendar = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
     _dwTxtFlag: DWORD,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -97,9 +93,6 @@ global Calendar = @record
 	onValueChanged: EventHandler,
 	onSelectionChanged: EventHandler,
 	onViewChanged: EventHandler,
-	-- onKeyDown: KeyEventHandler,
-	-- onKeyUp: KeyEventHandler,
-	-- onKeyPress: KeyEventHandler,
 }
 
 -- Public function
@@ -118,9 +111,7 @@ function Calendar.new(frm : *Form, x: integer, y: integer) : Calendar
 	this._isTextable = false
 	this.backColor = frm.backColor
 	this.foreColor = colorBlack
-
 	this.cid = frm._cidNumber
-
     calNumber = calNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	if not app.isDateInit then
@@ -131,6 +122,7 @@ function Calendar.new(frm : *Form, x: integer, y: integer) : Calendar
 	return this
 end
 
+--Private function
 function Calendar:setCalenderStyles()
 	if self.showWeekNum then self._style = self._style | MCS_WEEKNUMBERS end
     if self.noTodayCircle then self._style = self._style | MCS_NOTODAYCIRCLE end
@@ -139,6 +131,7 @@ function Calendar:setCalenderStyles()
     if self.shortDayNames then self._style = self._style | MCS_SHORTDAYSOFWEEK end
 end
 
+--Private function
 function Calendar:setSizeAndValue()
     local rct : RECT
 	SendMessageW(self.handle, MCM_GETMINREQRECT, 0, (@LPARAM)(&rct))
@@ -161,6 +154,7 @@ function Calendar:createHandle()
 	end
 end
 
+--Private function
 function Calendar:destroy()
 	print("Calendar destroyed")
 	-- DeleteObject(self._bkBrush)
@@ -182,10 +176,6 @@ function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
-	-- case WM_KEYUP then keyUpHandler(this, wpm)
-	-- case WM_CHAR then keyPressHandler(this, wpm)
-
 	case MM_NOTIFY_REFLECT then
 		local nm = (@LPNMHDR)(lpm)
 		switch nm.code do
