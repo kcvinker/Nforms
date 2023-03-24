@@ -15,7 +15,7 @@ local LOGPIXELSY : cint = 90
 
 global FontWight = @enum {Thin = 100, ExtraLight = 200, Light = 300, Normal = 400, Medium = 500, SemiBold = 600, Bold = 700, ExtraBold = 800, Thick = 900}
 
-local LOGFONTW = @record
+local LOGFONTW : type <cimport,nodecl> = @record 
 {
 	lfHeight : LONG,
 	lfWidth : LONG,
@@ -57,9 +57,9 @@ function Font.new(fname: string, fsize: integer, fweight: FontWight, ital: boole
 	this.weight = fweight == 0 and FontWight.Normal or fweight
 	this.italics = ital
 	this.underline = under
-	this.strikeOut = strike	
+	this.strikeOut = strike
 
-	return this	
+	return this
 end
 
 function Font:init()
@@ -74,8 +74,8 @@ function Font:createHandle(hwnd: HWND)
 	ReleaseDC(hwnd, hdc)
 	local fname: [32]WCHAR
 	local wfname = toWstrArray(self.name)
-	
-	for i, v in ipairs(wfname.data) do 
+
+	for i, v in ipairs(wfname.data) do
 		if i > 32 then break end
 		fname[i] =  v
 	end
@@ -90,10 +90,10 @@ function Font:createHandle(hwnd: HWND)
 	lf.lfClipPrecision = CLIP_DEFAULT_PRECIS
 	lf.lfQuality = DEFAULT_QUALITY
 	lf.lfPitchAndFamily = DEFAULT_PITCH
-	self.handle = CreateFontIndirectW(&lf)	
+	self.handle = CreateFontIndirectW(&lf)
 end
 
-function Font:createHandleEx(hwnd : HWND) 
+function Font:createHandleEx(hwnd : HWND)
 	local hdc : HDC = GetDC(hwnd)
 	local fontHeight: LONG = -MulDiv(self.size, GetDeviceCaps(hdc, LOGPIXELSY), 72)
 	ReleaseDC(hwnd, hdc)
@@ -102,7 +102,7 @@ function Font:createHandleEx(hwnd : HWND)
 	local strike: DWORD = self.strikeOut and 1 or 0
 	self.handle = CreateFontW(fontHeight, 0, 0, 0, (@culong)(self.weight), ital, under, strike, (@DWORD)(1),
 								OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-	 							DEFAULT_QUALITY, DEFAULT_PITCH, wstrPtr(self.name))
+	 							DEFAULT_QUALITY, DEFAULT_PITCH, toUTF16(self.name))
 end
 
 function Font:setFontInternal(hwnd: HWND)

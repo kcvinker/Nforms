@@ -153,6 +153,182 @@ global RDW_UPDATENOW : UINT <comptime> = 256
     }
     global LPCOMBOBOXINFO = @*COMBOBOXINFO
 
+    global SYSTEMTIME : type <cimport,nodecl> = @record {
+        wYear : WORD,
+        wMonth : WORD,
+        wDayOfWeek : WORD,
+        wDay : WORD,
+        wHour : WORD,
+        wMinute : WORD,
+        wSecond : WORD,
+        wMilliseconds : WORD,
+    }
+    global LPSYSTEMTIME = @*SYSTEMTIME
+
+    global NMDATETIMESTRINGW : type <cimport,nodecl> = @record {
+        nmhdr : NMHDR,
+        pszUserString : LPCWSTR,
+        st : SYSTEMTIME,
+        dwFlags : DWORD,
+    }
+    global LPNMDATETIMESTRINGW = @*NMDATETIMESTRINGW
+
+    global NMDATETIMEWMKEYDOWNW : type <cimport,nodecl> = @record {
+        nmhdr : NMHDR,
+        nVirtKey : cint,
+        pszFormat : LPCWSTR,
+        st : SYSTEMTIME,
+    }
+    global LPNMDATETIMEWMKEYDOWNW = @*NMDATETIMEWMKEYDOWNW
+
+    global NMDATETIMEFORMATW : type <cimport,nodecl> = @record {
+        nmhdr : NMHDR,
+        pszFormat : LPCWSTR,
+        st : SYSTEMTIME,
+        nVirtKey : cint,
+        pszDisplay: LPCWSTR,
+        szDisplay: [64]WCHAR,
+    }
+    global LPNMDATETIMEFORMATW = @*NMDATETIMEFORMATW
+
+    global NMDATETIMECHANGE : type <cimport,nodecl> = @record {
+        nmhdr : NMHDR,
+        dwFlags : DWORD,
+        st : SYSTEMTIME,
+    }
+    global LPNMDATETIMECHANGE = @*NMDATETIMECHANGE
+
+    global NMUPDOWN : type <cimport,nodecl> = @record {
+        hdr : NMHDR,
+        iPos : cint,
+        iDelta : cint,
+    }
+    global LPNMUPDOWN = @*NMUPDOWN
+
+    global TVITEMEXW : type <cimport,nodecl> = @record {
+        mask: UINT,
+        hItem: HTREEITEM,
+        state: UINT,
+        stateMask: UINT,
+        pszText: LPWSTR,
+        cchTextMax: cint,
+        iImage: cint,
+        iSelectedImage: cint,
+        cChildren: cint,
+        lParam: LPARAM,
+        iIntegral: cint,
+        uStateEx: UINT,
+        hwnd: HWND,
+        iExpandedImage: cint ,
+        iReserved: cint,
+    }
+    global LPTVITEMEXW = @*TVITEMEXW
+
+    global TVINSERTSTRUCTW : type <cimport,nodecl> = @record {
+        hParent: HTREEITEM,
+        hInsertAfter: HTREEITEM,
+        itemex: TVITEMEXW,
+    }
+    global LPTVINSERTSTRUCTW = @*TVINSERTSTRUCTW
+
+    global LVCOLUMNW : type <cimport,nodecl> = @record {
+        mask: cuint,
+        fmt: cint,
+        cx: cint,
+        pszText: LPCWSTR,
+        cchTextMax: cint,
+        iSubItem: cint,
+        iImage: cint,
+        iOrder: cint,
+        cxMin: cint,
+        cxDefault: cint,
+        cxIdeal: cint,
+    }
+    global LPLVCOLUMNW = @*LVCOLUMNW
+
+    global LVITEMW : type <cimport,nodecl> = @record {
+        mask: cuint,
+        iItem: cint,
+        iSubItem: cint,
+        state: cint,
+        stateMask: cint,
+        pszText: LPCWSTR,
+        cchTextMax: cint,
+        iImage: cint,
+        lParam: LPARAM,
+        iIndent: cint,
+        iGroupId: cint,
+        cColumns: cuint,
+        puColumns: *cuint,
+        piColFmt: *cint,
+        iGroup: cint,
+    }
+    global LPLVITEMW = @*LVITEMW
+
+    global HDHITTESTINFO : type <cimport,nodecl> = @record {
+        pt: POINT,
+        flags: UINT,
+        iItem: cint,
+    }
+    global LPHDHITTESTINFO = @*HDHITTESTINFO
+
+    global WINDOWPOS : type <cimport,nodecl> = @record {
+        hwnd : HWND,
+        hwndInsertAfter : HWND,
+        x : cint,
+        y : cint,
+        cx : cint,
+        cy : cint,
+        flags : UINT
+    }
+    global LPWINDOWPOS = @*WINDOWPOS
+
+    global HDLAYOUT : type <cimport,nodecl> = @record {
+        prc: *RECT,
+        pwpos: *WINDOWPOS,
+    }
+    global LPHDLAYOUT = @*HDLAYOUT
+
+    global NMLVCUSTOMDRAW : type <cimport,nodecl> = @record {
+        nmcd: NMCUSTOMDRAW,
+        clrText: COLORREF,
+        clrTextBk: COLORREF,
+        iSubItem: cint,
+        dwItemType: DWORD,
+        clrFace: COLORREF,
+        iIconEffect: cint,
+        iIconPhase: cint,
+        iPartId: cint,
+        iStateId: cint,
+        rcText: RECT,
+        uAlign: UINT,
+    }
+    global LPNMLVCUSTOMDRAW = @*NMLVCUSTOMDRAW
+
+    global NMLISTVIEW : type <cimport,nodecl> = @record {
+        hdr: NMHDR,
+        iItem: cint,
+        iSubItem: cint,
+        uNewState: UINT,
+        uOldState: UINT,
+        uChanged: UINT,
+        ptAction: POINT,
+        lParam: LPARAM,
+    }
+    global LPNMLISTVIEW = @*NMLISTVIEW
+
+    global NMITEMACTIVATE : type <cimport,nodecl> = @record {
+        hdr: NMHDR,
+        iItem: cint,
+        iSubItem: cint,
+        uNewState: UINT,
+        uOldState: UINT,
+        uChanged: UINT,
+        ptAction: POINT,
+        lParam: LPARAM,
+        uKeyFlags: UINT,
+    }
+    global LPNMITEMACTIVATE = @*NMITEMACTIVATE
 
 --End of Structs
 
@@ -215,6 +391,7 @@ global RDW_UPDATENOW : UINT <comptime> = 256
 
 local function MultiByteToWideChar(CodePage: cuint, dwFlags: culong, lpMultiByteStr: LPCCH, cbMultiByte: cint, lpWideCharStr: LPWSTR, cchWideChar: cint): cint <cimport,cinclude'<windows.h>',nodecl> end
 local function WideCharToMultiByte(CodePage: cuint, dwFlags: culong, lpWideCharStr: LPCWCH, cchWideChar: cint, lpMultiByteStr: LPSTR, cbMultiByte: cint, lpDefaultChar: LPCCH, lpUsedDefaultChar: LPBOOL): cint <cimport,cinclude'<windows.h>',nodecl> end
+local function wcslen(pstr: LPCWSTR) : isize <cimport,cinclude'<wchar.h>',nodecl> end
 
 global function HandleToULong(h: pointer): culong <cimport,nodecl> end
 global function HandleToLong(h: pointer): clong <cimport,nodecl> end
@@ -247,8 +424,8 @@ global function GetModuleHandleW(lpModuleName: LPCWSTR): HMODULE <cimport,nodecl
 --global function LoadLibraryW(lpLibFileName: LPCWSTR): HMODULE <cimport,nodecl> end
 --global function FreeLibrary(hLibModule: HMODULE): cint <cimport,nodecl> end
 
---global function InitCommonControls(): void <cimport,nodecl> end
---global function InitCommonControlsEx(piccEx : LPINITCOMMONCONTROLSEX): BOOL <cimport,cinclude'<commctrl.h>',nodecl> end
+
+global function InitCommonControlsEx(piccEx : LPINITCOMMONCONTROLSEX): BOOL <cimport, cinclude'<commctrl.h>',nodecl> end
 --global function SetWindowTheme(hWnd: HWND, sApp : LPCWSTR, subId : LPCWSTR): HRESULT <cimport,nodecl> end
 global function Sleep(dwMilliseconds: culong): void <cimport,nodecl> end
 global function Beep(dwFreq: culong, dwDuration: culong): cint <cimport,nodecl> end
@@ -271,6 +448,9 @@ global function GetWindowTextW(hwnd: HWND, lpString: LPWSTR, nMaxCount: cint): c
 global function GetWindowRect(hwnd: HWND, lpRect: LPRECT): BOOL <cimport,nodecl> end
 global function GetMessagePos(): DWORD <cimport,nodecl> end
 global function PtInRect(lpRect: LPRECT <const>, pt : POINT): BOOL <cimport,nodecl> end
+global function CreateMenu(): HMENU <cimport,nodecl> end
+global function SetMenu (hwnd: HWND, hmenu: HMENU): BOOL <cimport,nodecl> end
+global function AppendMenuW(hmenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR): BOOL <cimport,nodecl> end
 
 global function RegisterClassExW(a1: LPWNDCLASSEXW): cushort <cimport,nodecl> end
 
@@ -308,6 +488,11 @@ global function FillRect(hDc: HDC, lprc: LPRECT, hbr: HBRUSH): cint <cimport,nod
 global function GetClientRect(hWnd: HWND, lprc: LPRECT): BOOL <cimport,nodecl> end
 global function RedrawWindow(hWnd: HWND, lprc: LPRECT, hrgnUpdate: HRGN, flags: UINT): BOOL <cimport,nodecl> end
 global function SetWindowPos(hWnd: HWND, hWndInsertAfter: HWND, x: cint, y: cint, cx: cint, cy: cint, flags: UINT): BOOL <cimport,nodecl> end
+global function GetCursorPos(lpPoing: LPPOINT): BOOL <cimport,nodecl> end
+global function ScreenToClient(hWnd: HWND, lpPoing: LPPOINT): BOOL <cimport,nodecl> end
+global function HideCaret(hWnd: HWND): BOOL <cimport,nodecl> end
+global function DrawEdge(hdc: HDC, qrc: LPRECT, edge: UINT, grfFlags: UINT): BOOL <cimport,nodecl> end
+
 
 
 global function SetWindowSubclass(hWnd: HWND, pfnSubclass: SUBCLASSPROC, uIdSubclass: UINT_PTR, dwRefData: DWORD_PTR): BOOL <cimport,nodecl> end
@@ -328,6 +513,10 @@ global function CreatePatternBrush(hbm: HBITMAP): HBRUSH <cimport,nodecl> end
 global function SetBkColor(hdc : HDC, cref : COLORREF) : COLORREF <cimport,nodecl> end
 global function GetTextExtentPoint32W(hdc : HDC, lpString: LPCWSTR, c: cint, psize: LPSIZE) : BOOL <cimport,nodecl> end
 global function GetStockObject(i : cint) : HGDIOBJ <cimport,nodecl> end
+global function TextOutW(hdc: HDC, x: cint, y : cint, lpString: LPCWSTR, c: cint) : BOOL <cimport,nodecl> end
+global function MoveToEx(hdc: HDC, x: cint, y : cint, lppt: LPPOINT) : BOOL <cimport,nodecl> end
+global function LineTo(hdc: HDC, x: cint, y : cint) : BOOL <cimport,nodecl> end
+global function Rectangle(hdc: HDC, left: cint, top: cint, right: cint, bottom: cint): BOOL <cimport,nodecl> end
 
 
 
@@ -365,11 +554,23 @@ global function GetStockObject(i : cint) : HGDIOBJ <cimport,nodecl> end
             s:destroy()
             return string{}
         end
-        return s
+        return tostring(s)
     end
 
     global function toUTF8(wstr : wstring) : string
         return utf16_to_utf8(wstr)
+    end
+
+    global function wcharArrayToString(ws: *WCHAR, length: integer): string
+        if length == 0 then length = wcslen(ws) end
+        local len: cint = WideCharToMultiByte(CP_UTF8, 0, ws, length, nilptr, 0, nilptr, nilptr)
+        if len <= 0 then return string{} end -- empty or failed
+        local s: string = string.create(len)
+        if WideCharToMultiByte(CP_UTF8, 0, ws, length, s.data, len, nilptr, nilptr) ~= len then -- failed?
+            s:destroy()
+            return string{}
+        end
+        return s
     end
 
 

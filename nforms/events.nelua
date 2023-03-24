@@ -74,11 +74,18 @@ global SizeEventArgs = @record {
     clientArea : Area,
 }
 
+global DateTimeEventArgs = @record {
+    dateString: string,
+    dateStruct: LPSYSTEMTIME,
+    handled: boolean,
+}
+
 
 global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
 global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
 global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
 global SizeEventHandler = @function(ctrl: pointer, eargs: *SizeEventArgs): void
+global DateTimeEventHandler = @function(ctrl: pointer, eargs: *DateTimeEventArgs): void
 
 
 
@@ -128,6 +135,11 @@ function SizeEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM): SizeEventArgs
     return this
 end
 
+function DateTimeEventArgs.new(dtpStr: LPCWSTR): DateTimeEventArgs
+    local this: DateTimeEventArgs
+    this.dateString = wcharArrayToString(dtpStr)
+    return this
+end
 
 
 

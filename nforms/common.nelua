@@ -5,7 +5,12 @@ require "nforms.events"
 
 global subClassID : UINT_PTR = 1000 -- global subclass id.
 global GradColor = @record {c1: Color, c2: Color,} -- Users of this record - Button & Form
+global TextAlign = @enum {Left = 0, Center, Right}
 
+global colorWhite = Color.new(0xFFFFFF)
+global colorBlack = Color.new(0x000000)
+global UINT_MAX <comptime> = 1 << 32
+-- global ULONG_MAX <comptime> = #[primtypes.uint32.max]# + 1 -- #[primtypes.uint64.max]# --1 << 64
 
 
 
@@ -16,14 +21,55 @@ global GradColor = @record {c1: Color, c2: Color,} -- Users of this record - But
 	global MM_MOUSE_LB_CLICK: UINT <comptime> = MM_NUMBER + 1
 	global MM_MOUSE_RB_CLICK: UINT <comptime> = MM_NUMBER + 2
 	global MM_NOTIFY_REFLECT: UINT <comptime> = MM_NUMBER + 3
+	global MM_EDIT_COLOR: UINT <comptime> = MM_NUMBER + 4
+	global MM_LABEL_COLOR: UINT <comptime> = MM_NUMBER + 5
+	global MM_CTL_COMMAND: UINT <comptime> = MM_NUMBER + 6
+	global MM_LIST_COLOR: UINT <comptime> = MM_NUMBER + 7
+	global MM_BUDDY_RESIZE: UINT <comptime> = MM_NUMBER + 8
+	global MM_HSCROLL: UINT <comptime> = MM_NUMBER + 9
+	global MM_VSCROLL: UINT <comptime> = MM_NUMBER + 10
+	global MM_MENU_EVENT: UINT <comptime> = MM_NUMBER + 11
 --End of My Messages
+
+-- Common Constants
+
+	global NM_FIRST <comptime> = UINT_MAX
+	global HDM_FIRST <comptime> = 0x1200
+	global NM_CUSTOMDRAW <comptime> = NM_FIRST-12
+	global SWP_NOMOVE <comptime> = 0x0002
+	global SWP_NOZORDER <comptime> = 0x0004
+	global SWP_NOACTIVATE <comptime> = 0x0010
+	global SWP_SHOWWINDOW <comptime> = 0x0040
+	global SWP_FRAMECHANGED <comptime> = 0x0020
+	global ICC_DATE_CLASSES <comptime> = 0x00000100
+	global HDM_LAYOUT <comptime> = (HDM_FIRST + 5)
+	global HDM_HITTEST <comptime> = (HDM_FIRST + 6)
+	global HDM_GETITEMRECT <comptime> = (HDM_FIRST + 7)
+
+	-- DrawText flags
+	global BF_LEFT <comptime> = 0x0001
+	global BF_TOP <comptime> = 0x0002
+	global BF_RIGHT <comptime> = 0x0004
+	global BF_BOTTOM <comptime> = 0x0008
+	global BF_TOPLEFT <comptime> = (BF_TOP | BF_LEFT)
+	global BF_BOTTOMRIGHT <comptime> = (BF_BOTTOM | BF_RIGHT)
+	global BF_RECT <comptime> = (BF_LEFT | BF_TOP | BF_RIGHT | BF_BOTTOM)
+	global BF_ADJUST <comptime> = 0x2000
+	global BF_FLAT <comptime> = 0x4000
+	global BDR_SUNKENOUTER <comptime> = 0x0002
+	global HWND_TOP <comptime> = (@HWND)(0)
+
+	--Custom draw constants
+	global CDIS_SELECTED <comptime> = 0x0001
+
+--End
 
 
 global function createControl(ctrl: auto)
-	local ctrlTxt : LPCWSTR = ctrl.text and wstrPtr(ctrl.text) or nilptr
+	local ctrlTxt : LPCWSTR = ctrl.text and toUTF16(ctrl.text) or nilptr
 	ctrl.handle = CreateWindowExW(ctrl._exStyle, ctrl.className, ctrlTxt, ctrl._style,
 									ctrl.xpos, ctrl.ypos, ctrl.width, ctrl.height,
-                                	ctrl.parent.handle, nilptr, ctrl.parent.hInstance, nilptr)
+                                	ctrl.parent.handle, (@HMENU)(ctrl.cid), ctrl.parent.hInstance, nilptr)
 	if ctrl.handle ~= nilptr then
 		ctrl._isCreated = true
 		ctrl.font:setFontInternal(ctrl.handle)
@@ -32,7 +78,19 @@ end
 
 global function getXFromLPARAM(lpm: LPARAM) : integer return (@integer)(loWord(lpm)) end
 global function getYFromLPARAM(lpm: LPARAM) : integer return (@integer)(hiWord(lpm)) end
+global function getMousePos(lpm: LPARAM): POINT 
+	return {(@integer)(loWord(lpm)), (@integer)(hiWord(lpm))}
+end
 
+global function increment(x: auto): auto
+	x = x + 1
+	return x
+end
+global function printMsg(txt: string, ms: UINT)
+	local cnt = 1
+	print(string.format("[%d] %s : %d", cnt, txt, ms))
+	cnt = cnt + 1
+end
 
 --Set subclass for a control type.
 global function setSubClass(hwnd: HWND, pCtrl: pointer, pFunc: SUBCLASSPROC)
@@ -48,11 +106,24 @@ global function invalidateNow(ctrl: auto)
 	if ctrl._isCreated then InvalidateRect(ctrl.handle, nilptr, 0) end
 end
 
+global function sendMsg(ctrl: auto, msg: UINT, wpm: auto, lpm: auto): LRESULT
+	return SendMessageW(ctrl.handle, msg, (@WPARAM)(wpm), (@LPARAM)(lpm))
+end
+
 global function getCRect(c: auto): RECT
 	local rct: RECT
 	GetClientRect(c.handle, &rct)
 	return rct
 end
+
+global function toStr(x: auto): string
+	## if x.is_stringy then
+        return x
+    ## else
+        return tostring(x)
+    ## end
+end
+	
 
 --Common event handling functions
 	global function leftMouseDownHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
@@ -138,6 +209,27 @@ end
 			this.onMouseLeave(this, &ea)
 		end
 	end
+
+	global function keyDownHandler(this: auto, wp: WPARAM)
+		if this.onKeyDown ~= nilptr then
+			local kea = KeyEventArgs.new(wp)
+			this.onKeyDown(this, &kea)
+		end
+	end
+
+	global function keyUpHandler(this: auto, wp: WPARAM)
+		if this.onKeyUp ~= nilptr then
+			local kea = KeyEventArgs.new(wp)
+			this.onKeyUp(this, &kea)
+		end
+	end
+
+	global function keyPressHandler(this: auto, wp: WPARAM)
+		if this.onKeyPress ~= nilptr then
+			local kea = KeyEventArgs.new(wp)
+			this.onKeyPress(this, &kea)
+		end
+	end
 -- End of Event handlers
 
 
@@ -147,3 +239,27 @@ end
 	-- 	if (this._drawFlag & 1) ~= 1 then this._drawFlag = this._drawFlag + 1 end
 	-- 	invalidateNow(this)
 	-- end
+
+	-- Private function
+	global function setControlText(hwnd: HWND, txt: string)
+		SetWindowTextW(hwnd, toUTF16(txt) )
+	end
+	global function getControlText(hwnd: HWND): wstring
+		local count = GetWindowTextLengthW(hwnd)
+		local buffer: span(WCHAR) = default_allocator:spanalloc(@WCHAR, count + 1)
+		GetWindowTextW(hwnd, &buffer[0], count + 1)
+		return (@wstring){data = buffer}
+	end
+
+	global function setControlBackColor(ctl: auto, clr: uinteger)
+		ctl.backColor = Color.new(clr)
+		ctl._bkBrush = CreateSolidBrush(ctl.backColor.ref)
+		if (ctl._drawFlag & 2) ~= 2 then ctl._drawFlag = ctl._drawFlag + 2 end
+	end
+
+	global function setControlForeColor(ctl: auto, clr: uinteger)
+		ctl.foreColor = Color.new(clr)
+		if (ctl._drawFlag & 1) ~= 1 then ctl._drawFlag = ctl._drawFlag + 1 end
+	end
+
+--End

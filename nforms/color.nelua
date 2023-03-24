@@ -6,7 +6,13 @@ global function makeCOLORREF(red: uinteger, green: uinteger, blue: uinteger): CO
 	return (@COLORREF)((blue << 16) | (green << 8) | red)
 end
 
-global Color = @record {red: uinteger, green: uinteger, blue: uinteger, ref: COLORREF, value: uinteger, }
+global Color = @record {
+	red: uinteger, 
+	green: uinteger, 
+	blue: uinteger, 
+	value: uinteger, 
+	ref: COLORREF, 
+}
 
 
 local function clip(value: auto): auto
@@ -22,6 +28,7 @@ function Color.new(clr: uinteger): Color
 	this.ref = (@COLORREF)((this.blue << 16) | (this.green << 8) | this.red)
 	return this
 end
+
 function Color.fromRGB(r: uinteger, g: uinteger, b: uinteger): Color
 	local this: Color
 	this.value = (r << 16) | (g << 8) | b
@@ -48,7 +55,10 @@ function Color:changeColor(adj: number): Color
 end
 
 
-
+function Color:getHotBrush(adj: number): HBRUSH
+	local cclr = self:changeColor(adj)
+	return CreateSolidBrush(cclr.ref)
+end
 
 
 
