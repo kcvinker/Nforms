@@ -1,7 +1,5 @@
 --events module - Created on 02-Mar-2023 09:47 AM
 
-
-
 global function loWord(x: auto): WORD <inline>
     return (@WORD)(x & 0xffff)
 end
@@ -10,9 +8,7 @@ global function hiWord(x: auto): WORD <inline>
     return (@WORD)(x >> 16)
 end
 
-
-global MouseButtons = @enum
-{
+global MouseButtons = @enum {
     None = 0,
     Right = 2097152,
     Middle = 4194304,
@@ -21,10 +17,8 @@ global MouseButtons = @enum
     XButton2 = 16777216,
 }
 
-
 global KeyState = @enum {Released = 0, Pressed,}
-global Keys = @enum
-{
+global Keys = @enum {
     Modifier = -65536, None = 0, LeftButton, RightButton, Cancel, MiddleButton, Xbutton1, Xbutton2,
     BackSpace = 8, Tab, Clear = 12, Enter, Shift = 16, Ctrl, Alt, Pause, CapsLock, Escape = 27,
     Space = 32, PageUp, PageDown, End, Home, LeftArrow, UpArrow, RightArrow, DownArrow,
@@ -41,11 +35,9 @@ global Keys = @enum
     Process = 229, Packet = 231, Attn = 246, CrSel, ExSel, EraseEof, Play, Zoom, NoName, Pa1, OemClear,
 }
 
-
-
 global EventArgs = @record {handled: boolean, cancelled: boolean}
-global MouseEventArgs = @record
-{
+
+global MouseEventArgs = @record {
     handled: boolean,
     button: MouseButtons,
     shiftKey: KeyState,
@@ -65,7 +57,6 @@ global KeyEventArgs = @record {
     suppressKeyPress : boolean,
 }
 
-
 global Area = @record {width: integer, height: integer}
 global SizedPosition = @enum {LeftEdge = 1, RightEdge, TopEdge, TopLeftCorner, TopRightCorner, BottomEdge, BottomLeftCorner, BottomRightCorner,}
 global SizeEventArgs = @record {
@@ -80,14 +71,11 @@ global DateTimeEventArgs = @record {
     handled: boolean,
 }
 
-
 global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
 global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
 global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
 global SizeEventHandler = @function(ctrl: pointer, eargs: *SizeEventArgs): void
 global DateTimeEventHandler = @function(ctrl: pointer, eargs: *DateTimeEventArgs): void
-
-
 
 function MouseEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM)
     local fwKeys = (@WORD)(wpm & 0xffff)
@@ -99,15 +87,12 @@ function MouseEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM)
         case 17 then this.button = MouseButtons.Middle
         case 33 then this.button = MouseButtons.XButton1
     end
-
     switch msg do
         case WM_LBUTTONDOWN, WM_LBUTTONUP then this.button = MouseButtons.Left
         case WM_RBUTTONDOWN, WM_RBUTTONUP then this.button = MouseButtons.Right
     end
-
     this.x = (@integer)(loWord((@DWORD)(lpm)))
     this.y = (@integer)(hiWord((@DWORD)(lpm)))
-
     return this
 end
 
@@ -140,6 +125,3 @@ function DateTimeEventArgs.new(dtpStr: LPCWSTR): DateTimeEventArgs
     this.dateString = wcharArrayToString(dtpStr)
     return this
 end
-
-
-

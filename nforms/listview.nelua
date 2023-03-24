@@ -1,7 +1,5 @@
 
-
 -- ListView module - Created on 21-Mar-2023 04:34 PM
-
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -66,31 +64,6 @@ require "nforms.common"
 	local NM_CLICK <comptime> = (NM_FIRST-2)
 	local NM_DBLCLK <comptime> = (NM_FIRST-3)
 	local NM_HOVER <comptime> = (NM_FIRST-13)
-	
-	-- local TVIS_DROPHILITED <comptime> = 0x0008
-	-- local TVIS_BOLD <comptime> = 0x0010
-	-- local TVIS_EXPANDED <comptime> = 0x0020
-	-- local TVIS_EXPANDEDONCE <comptime> = 0x0040
-	-- local TVIS_EXPANDPARTIAL <comptime> = 0x0080
-	-- local TVIS_OVERLAYMASK <comptime> = 0x0F00
-	-- local TVIS_STATEIMAGEMASK <comptime> = 0xF000
-	-- local TVIS_USERMASK <comptime> = 0xF000
-	-- local TVIS_EX_FLAT <comptime> = 0x0001
-	-- local TVIS_EX_DISABLED <comptime> = 0x0002
-	-- local TVIS_EX_ALL <comptime> = 0x0002
-
-	-- local TVI_ROOT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x10000))--(ULONG_MAX-0x10000)
-	-- local TVI_FIRST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFF)) --(ULONG_MAX-0x0FFFF)
-	-- local TVI_LAST <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFE))
-	-- local TVI_SORT <comptime> = (@HTREEITEM)((@ULONG_PTR)(-0x0FFFD))
-
-	-- local TV_FIRST <comptime> = 0x1100
-	-- local TVM_DELETEITEM <comptime> = (TV_FIRST + 1)
-	-- local TVM_SETIMAGELIST <comptime> = (TV_FIRST + 9)
-	-- local TVM_SETBKCOLOR <comptime> = (TV_FIRST + 29)
-	-- local TVM_SETTEXTCOLOR <comptime> = (TV_FIRST + 30)
-	-- local TVM_SETLINECOLOR <comptime> = (TV_FIRST + 40)
-	-- local TVM_INSERTITEMW <comptime> = (TV_FIRST + 50)
 --End
 
 local lvStyle <comptime> = WS_VISIBLE|WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS|LVS_REPORT|WS_BORDER|LVS_ALIGNLEFT|LVS_SINGLESEL
@@ -99,11 +72,8 @@ local function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UI
 local function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global ListViewStyle = @enum {LargeIcon = 0, ReportView, SmallIcon, ListView, TileView }
--- global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
--- global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
 
 global ListViewColumn = @record {
-	--Public props
 	text: string,
 	width: integer,
 	index: integer,
@@ -114,7 +84,6 @@ global ListViewColumn = @record {
 	headerTextAlign: TextAlign,	
 	backColor: Color,
 	foreColor: Color,
-
 	--Private props
 	_drawNeeded: boolean,
 	_isHotItem: boolean,
@@ -133,8 +102,7 @@ global ListViewItem = @record {
 	subItems: vector(string),
 }
 
-global ListView = @record
-{
+global ListView = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -147,9 +115,8 @@ global ListView = @record
 	font: Font,
 	parent : *Form,
 	backColor: Color,
-	foreColor: Color,	
-
-	--ListView's own properties
+	foreColor: Color,
+	--ListView's unique properties
 	selectedIndex: integer,
 	selectdeSubIndex: integer,
 	headerHeight: integer,
@@ -172,7 +139,6 @@ global ListView = @record
 	viewStyle: ListViewStyle,
 	columns: vector(*ListViewColumn),
 	items: vector(*ListViewItem),
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -183,7 +149,6 @@ global ListView = @record
 	_isMouseEntered: boolean,
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
-
 	_hdrHotBrush: HBRUSH,
 	_hdrBkBrush: HBRUSH,
 	_hdrPen: HPEN,
@@ -194,7 +159,6 @@ global ListView = @record
     _hotHdrIndex: integer,
     _hdrHwnd: HWND,
     _changeHdrHeight: boolean,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -229,7 +193,6 @@ function ListView.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this._exStyle = 0
 	this.backColor = colorWhite
 	this.foreColor = colorBlack 
-
 	this.viewStyle = ListViewStyle.ReportView
 	this.showGrid = true
 	this.fullRowSelect = true
@@ -240,8 +203,7 @@ function ListView.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this._itemIndex = -1
 	this._hotHdrIndex = -1
 	this.headerBackColor = Color.new(0xdce1de) 
-	this.headerForeColor = Color.new(0x000000)
-    
+	this.headerForeColor = Color.new(0x000000)    
     lvNumber = lvNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
@@ -333,7 +295,7 @@ function ListView:createHandle()
 	end
 end
 
-
+--Private function
 function ListView:addColumnInternal(lvCol: *ListViewColumn)
 	lvCol.index = self._colIndex 
     local lvc: LVCOLUMNW
@@ -369,6 +331,7 @@ function ListView:addColumns(colNames: span(string), widths: span(integer))
 	end
 end
 
+--Private function
 function ListView:addItemInternal(item: *ListViewItem)
 	item.index = self._rowIndex
 	local lvi: LVITEMW
@@ -387,6 +350,7 @@ function ListView:addItemInternal(item: *ListViewItem)
     self._rowIndex = self._rowIndex + 1
 end
 
+--Private function
 function ListView:addSubItemInternal(sItem: string, itemIndex: integer, subIndx: integer, imgIndex: integer)
 	local lw: LVITEMW
     lw.iSubItem = subIndx
@@ -416,22 +380,22 @@ function ListView:addRows(... : varargs)
 	end
 end
 
--- function ListView:insertNode(txt: string, index: integer) : *TreeNode
--- 	local node: *TreeNode = TreeNode.new(txt)
--- 	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
--- 	return node
--- end
+function ListView:addItem(txt: string) : *ListViewItem
+	local item: *ListViewItem = ListViewItem.new(txt)
+	self:addItemInternal(item)
+	return item
+end
 
--- function ListView:insertNodeEx(node: *TreeNode, index: integer)
--- 	self:addNodeInernal(NodeOps.InsertNode, node, nilptr, index)
--- end
+function ListView:addItemEx(item: *ListViewItem)
+	self:addItemInternal(item)
+end
 
--- function ListView:insertChildNode(txt: string, parentNode: *TreeNode, index: integer) : *TreeNode
--- 	local node: *TreeNode = TreeNode.new(txt)
--- 	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
--- 	return node
--- end
+function ListView:addSubItem(subitem: auto, itemIndex: integer, subIndex: integer)
+	local sItem: string = toStr(subitem)
+	self:addSubItemInternal(sItem, itemIndex, subIndex, -1)
+end
 
+--Private function
 function ListView:headerCustomDraw(nmcd: LPNMCUSTOMDRAW): LRESULT
 	local col = self.columns[nmcd.dwItemSpec]
     SetBkMode(nmcd.hdc, 1)
@@ -468,11 +432,14 @@ function ListView:headerCustomDraw(nmcd: LPNMCUSTOMDRAW): LRESULT
     return CDRF_SKIPDEFAULT
 end
 
-
-function ListView:destroy()
-	-- DeleteObject(self._bkBrush)	
+--Private function
+function ListView:destroy()	
+	if self._hdrHotBrush ~= nilptr then DeleteObject(self._hdrHotBrush) end
+    if self._hdrBkBrush ~= nilptr then DeleteObject(self._hdrBkBrush) end
+    if self._hdrPen ~= nilptr then DeleteObject(self._hdrPen) end
 	print("ListView destroyed")
 end
+
 
 function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 	local this = (@*ListView)((pointer)(refData))
@@ -490,8 +457,7 @@ function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)	
-
+	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)
     case MM_NOTIFY_REFLECT then
         local nmh = (@LPNMHDR)(lpm)
     	switch nmh.code do
@@ -557,11 +523,8 @@ function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
                 end
         end
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
-
-
 
 function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 	local this = (@*ListView)((pointer)(refData))
@@ -606,6 +569,5 @@ function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
         ReleaseDC(hw, hdc)
         return 0
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end

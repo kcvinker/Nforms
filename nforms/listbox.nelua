@@ -1,6 +1,5 @@
 -- ListBox module - Created on 11-Mar-2023 02:36 PM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
@@ -31,7 +30,6 @@ require "nforms.common"
 	local LB_SETSEL <comptime> = 0x0185
 	local LB_GETCARETINDEX <comptime> = 0x019F
 
-
 	local LBN_ERRSPACE <comptime> = -2
 	local LBN_SELCHANGE <comptime> = 1
 	local LBN_DBLCLK <comptime> = 2
@@ -39,17 +37,12 @@ require "nforms.common"
 	local LBN_SETFOCUS <comptime> = 4
 	local LBN_KILLFOCUS <comptime> = 5
 	local LB_ERR <comptime> = -1
-
 --End
 
--- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
--- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local lbxNumber = 1
 local function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-
-global ListBox = @record
-{
+global ListBox = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -73,7 +66,6 @@ global ListBox = @record
     selectedIndex: integer,
 	selectedIndices: vector(integer),
 	items: vector(string),
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -85,7 +77,6 @@ global ListBox = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
     _dummyIndex: integer,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -122,12 +113,12 @@ function ListBox.new(frm : *Form, x: integer, y: integer, w: integer, h: integer
 	this._exStyle = 0
 	this.backColor = colorWhite
 	this.foreColor = colorBlack
-
     lbxNumber = lbxNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
+--Private function
 function ListBox:setLbxStyle()
 	if self.hasSort then self._style = self._style | LBS_SORT end
     if self.multiSelection then self._style = self._style | LBS_EXTENDEDSEL | LBS_MULTIPLESEL end
@@ -139,7 +130,7 @@ function ListBox:setLbxStyle()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
-
+--Private function
 function ListBox:fillItems()
 	if self.items.size > 0 then
 		for _, item in ipairs(self.items) do
@@ -148,11 +139,13 @@ function ListBox:fillItems()
 	end
 end
 
+--Private function
 function ListBox:clearItemsInternal()
 	SendMessageW(self.handle, LB_RESETCONTENT, 0, 0)
     UpdateWindow(self.handle)
 end
 
+--Private function
 function ListBox:getItemInternal(index: integer): string
 	local result : string
 	local tLen = SendMessageW(self.handle, LB_GETTEXTLEN, index, 0)
@@ -164,9 +157,6 @@ function ListBox:getItemInternal(index: integer): string
 	end
 	return result
 end
-
-
-
 
 -- Public function
 function ListBox:createHandle()
@@ -332,6 +322,7 @@ function ListBox:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 function ListBox:destroy()
 	print("ListBox destroyed")
 	DeleteObject(self._bkBrush)
@@ -356,7 +347,6 @@ function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
-
     case MM_CTL_COMMAND then
 		local nCode = hiWord(wpm)
 		switch nCode do
@@ -387,7 +377,6 @@ function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 					this.onGotFocus(this, &ea)
 				end
 			-- case LBN_SELCANCEL then
-
 		end
 
 	case MM_LIST_COLOR then
@@ -398,6 +387,5 @@ function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 		end
 		return (LRESULT)(this._bkBrush)
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end

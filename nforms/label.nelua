@@ -1,28 +1,15 @@
 
 -- Label module - Created on 10-Mar-2023 03:02 PM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
 require "nforms.common"
 
 --Constants
-	local SWP_NOMOVE <comptime> = 0x0002
 	local SS_NOTIFY <comptime> = 0x0100
 	local SS_SUNKEN <comptime> = 0x1000
 	local HOLLOW_BRUSH <comptime> = 0
-	-- local ES_WANTRETURN <comptime> = 4096
-	-- local ES_NOHIDESEL <comptime> = 256
-	-- local ES_READONLY <comptime> = 0x800
-	-- local ES_LOWERCASE <comptime> = 16
-	-- local ES_UPPERCASE <comptime> = 8
-
-	-- local ES_NUMBER <comptime> = 0x2000
-	-- local ES_PASSWORD <comptime> = 32
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
 --End
 
 local lbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
@@ -30,15 +17,14 @@ local lbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS
 local lbNumber = 1
 local function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-
 global LabelBorder = @enum {noBorder = 0, singleLine, sunkenBorder}
 
-global Label = @record
-{
+global Label = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
 	handle : HWND,
+	cid: integer,
 	width : integer,
 	height : integer,
 	xpos : integer,
@@ -52,7 +38,6 @@ global Label = @record
 	autoSize: boolean,
 	rightAlign: boolean,
     border: LabelBorder,
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -64,7 +49,6 @@ global Label = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
     _dwTxtFlag: DWORD,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -100,10 +84,13 @@ function Label.new(frm : *Form, txt: string, x: integer, y: integer, w: integer,
 	this.foreColor = colorBlack
     this.autoSize = true
     this.border = LabelBorder.noBorder
+	this.cid = frm._cidNumber
     lbNumber = lbNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
+--Private function
 function Label:setlbBorder()
 	if self.border == LabelBorder.sunkenBorder then
         self._style = self._style | SS_SUNKEN
@@ -113,6 +100,7 @@ function Label:setlbBorder()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
+--Private function
 function Label:checkForAutoSize()
     if self.multiLine or self.width ~= 0 or self.height ~= 0 then self.autoSize = false end
     if not self.autoSize then
@@ -121,6 +109,7 @@ function Label:checkForAutoSize()
     end
 end
 
+--Private function
 function Label:calculateAutoSize()
     local hdc = GetDC(self.handle)
     defer ReleaseDC(self.handle, hdc) end
@@ -172,6 +161,7 @@ function Label:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 function Label:destroy()
 	print("Label destroyed")
 	DeleteObject(self._bkBrush)
@@ -193,10 +183,6 @@ function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
-	-- case WM_KEYUP then keyUpHandler(this, wpm)
-	-- case WM_CHAR then keyPressHandler(this, wpm)
-
 	case MM_LABEL_COLOR then
         local hdc = (HDC)(wpm)
 		if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end

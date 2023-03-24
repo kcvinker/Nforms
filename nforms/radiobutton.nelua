@@ -1,8 +1,5 @@
 
-
-
 -- RadioButton module - Created on 10-Mar-2023 07:49 PM
-
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -14,31 +11,17 @@ require "nforms.common"
 	local BCM_GETIDEALSIZE <comptime> = 0x1601
 	local BS_RIGHTBUTTON <comptime> = 0x00000200
 	local BM_SETCHECK <comptime> = 0x00F1
-	-- local ES_WANTRETURN <comptime> = 4096
-	-- local ES_NOHIDESEL <comptime> = 256
-	-- local ES_READONLY <comptime> = 0x800
-	-- local ES_LOWERCASE <comptime> = 16
-	-- local ES_UPPERCASE <comptime> = 8
-
-	-- local ES_NUMBER <comptime> = 0x2000
-	-- local ES_PASSWORD <comptime> = 32
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
 --End
 
--- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
--- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local rbNumber = 1
 local function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-
-global RadioButton = @record
-{
+global RadioButton = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
 	handle : HWND,
+	cid: integer,
 	width : integer,
 	height : integer,
 	xpos : integer,
@@ -51,7 +34,6 @@ global RadioButton = @record
     checked: boolean,
     checkOnClick: boolean,
 	rightAlign: boolean,
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -63,7 +45,6 @@ global RadioButton = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
     _dwTxtFlag: UINT,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -92,6 +73,7 @@ function RadioButton.new(frm : *Form, txt: string, x: integer, y: integer, w: in
 	this.ypos = y == 0 and 20 or y
 	this.font = frm.font
 	this.parent = frm
+	this.cid = frm._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON
 	this._exStyle = WS_EX_LTRREADING | WS_EX_LEFT
     this._dwTxtFlag = DT_SINGLELINE | DT_VCENTER
@@ -99,11 +81,12 @@ function RadioButton.new(frm : *Form, txt: string, x: integer, y: integer, w: in
 	this.backColor = frm.backColor
 	this.foreColor = colorBlack
     this.autoSize = true
-
     rbNumber = rbNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
+--Private function
 function RadioButton:setCbStyle()
 	if self.rightAlign then
 		self._style = self._style | BS_RIGHTBUTTON
@@ -113,7 +96,7 @@ function RadioButton:setCbStyle()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
-
+--Private function
 function RadioButton:setSize()
     local ss : SIZE
     SendMessageW(self.handle, BCM_GETIDEALSIZE, 0, (LPARAM)(&ss));
@@ -161,6 +144,7 @@ function RadioButton:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 function RadioButton:destroy()
 	print("RadioButton destroyed")
 	DeleteObject(self._bkBrush)
@@ -182,10 +166,6 @@ function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
-	-- case WM_KEYUP then keyUpHandler(this, wpm)
-	-- case WM_CHAR then keyPressHandler(this, wpm)
-
     case MM_CTL_COMMAND then
         if hiWord(wpm) == 0 then
             this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
@@ -215,9 +195,6 @@ function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
                 DrawTextW(nmc.hdc, toUTF16(this.text), -1, &rct, this._dwTxtFlag)
                 return CDRF_SKIPDEFAULT
         end
-
-
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end

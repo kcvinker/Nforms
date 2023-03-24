@@ -1,7 +1,5 @@
 
-
 -- TrackBar module - Created on 19-Mar-2023 12:32 PM
-
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -76,8 +74,7 @@ require "nforms.common"
 	local TBCD_TICS <comptime> = 0x1
 	local TBCD_THUMB <comptime> = 0x2
 	local TBCD_CHANNEL <comptime> = 0x3
-	local TRBN_THUMBPOSCHANGING <comptime> = TRBN_FIRST-1
-	
+	local TRBN_THUMBPOSCHANGING <comptime> = TRBN_FIRST-1	
 	
 	local THUMB_LINE_LOW <comptime> = 0
 	local THUMB_LINE_HIGH <comptime> = 1
@@ -86,8 +83,6 @@ require "nforms.common"
 	local U16_MAX <comptime> = 1 << 16
 --End
 
--- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
--- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local tkNumber = 1
 local function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
@@ -100,8 +95,7 @@ global TicData = @record {
 	logPoint: integer,
 }
 
-global TrackBar = @record
-{
+global TrackBar = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -115,8 +109,7 @@ global TrackBar = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-
-	--TrackBar's own properties
+	--TrackBar's unique properties
 	vertical: boolean,
     reversed: boolean,
 	noTics: boolean,
@@ -140,7 +133,6 @@ global TrackBar = @record
 	channelStyle: ChannelStyle,
 	trackChange: TrackChange,
 	ticPosition: TicPosition,
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -163,7 +155,6 @@ global TrackBar = @record
     _ticCount: integer,
     _chnFlag: DWORD,
     _ticList: vector(TicData),
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -174,12 +165,10 @@ global TrackBar = @record
 	onMouseScroll: MouseEventHandler,
 	onMouseEnter: EventHandler,
 	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	
+	onMouseLeave: EventHandler,	
 	onValueChanged: EventHandler,
 	onDragging: EventHandler,
-	onDragged: EventHandler,
-	
+	onDragged: EventHandler,	
 }
 
 -- Public Constructor
@@ -188,7 +177,7 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this.name = string.format("TrackBar_%d", tkNumber)
 	this.className = toUTF16("msctls_trackbar32")
 	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 80 or h
+	this.height = h == 0 and 45 or h
 	this.xpos = x == 0 and 20 or x
 	this.ypos = y == 0 and 20 or y
 	this.font = frm.font
@@ -197,8 +186,7 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this._style = WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS
 	this._exStyle = WS_EX_RIGHTSCROLLBAR | WS_EX_LTRREADING |WS_EX_LEFT
 	this.backColor = frm.backColor
-	this.foreColor = colorBlack
-   
+	this.foreColor = colorBlack   
     this._chnFlag = BF_RECT | BF_ADJUST
     this.ticWidth = 1
     this.ticLength = 4
@@ -213,7 +201,6 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
     this.ticColor = Color.new(0x3385ff)
 	this.channelColor = Color.new(0xc2c2a3)
 	this.selectionColor = Color.new(0x99ff33)
-
     tkNumber = tkNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
@@ -235,7 +222,6 @@ end
 	            case TicPosition.BothSide then self._style = self._style | TBS_BOTH
 	        end
 	    end
-
 	    if self.selectionRange then 
 	    	self._style = self._style | TBS_ENABLESELRANGE
 	    	self._chnFlag = BF_RECT | BF_ADJUST | BF_FLAT
@@ -338,27 +324,7 @@ function TrackBar:createHandle()
 	end
 end
 
--- function TrackBar:setText(txt: string)
--- 	self.text = txt
--- 	if self._isCreated then	setControlText(self.handle, txt) end
--- end
-
--- function TrackBar:getText(txt: string): string
--- 	if self._isCreated then
--- 		local wstr = getControlText(self.handle)
--- 		self.text = toUTF8(wstr)
--- 		return self.text
--- 	else
--- 		return self.text
--- 	end
--- end
-
--- function TrackBar:showSelection(clr: uinteger)
--- 	self.foreColor = Color.new(clr)
--- 	if (self._drawFlag & 1) ~= 1 then self._drawFlag = self._drawFlag + 1 end
--- 	invalidateNow(self)
--- end
-
+--Private function
 function TrackBar:setupValueInternal(iValue: integer)
 	if self.reversed then
         self.value = U16_MAX - iValue
@@ -367,21 +333,25 @@ function TrackBar:setupValueInternal(iValue: integer)
     end
 end
 
+--Private function
 function TrackBar:drawVerticalTics(hdc: HDC, px: integer, py: integer)
 	MoveToEx(hdc, px, py, nilptr)
     LineTo(hdc, px + self.ticLength, py)
 end
 
+--Private function
 function TrackBar:drawHorizontalTicsDown(hdc: HDC, px: integer, py: integer)
 	MoveToEx(hdc, px, py, nilptr)
     LineTo(hdc, px, py + self.ticLength)
 end
 
+--Private function
 function TrackBar:drawHorizontalTicsUpper(hdc: HDC, px: integer, py: integer)
 	MoveToEx(hdc, px, py, nilptr)
     LineTo(hdc, px, py - self.ticLength)
 end
 
+--Private function
 function TrackBar:drawTics(hdc: HDC)
 	SelectObject(hdc, self._ticPen)
     if self.vertical then
@@ -396,7 +366,6 @@ function TrackBar:drawTics(hdc: HDC)
                 self:drawVerticalTics(hdc, self._p2, p.phyPoint)
             end
        	end
-
     else
         switch self.ticPosition do
         case TicPosition.UpSide, TicPosition.DownSide then
@@ -412,12 +381,14 @@ function TrackBar:drawTics(hdc: HDC)
     end
 end
 
+--Private function
 function TrackBar:getThumbRect()
 	local rct : RECT
 	SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&rct))
 	return rct
 end
 
+--Private function
 function TrackBar:fillChannelRect(nm: LPNMCUSTOMDRAW, trc: RECT): boolean
 	--[[  If show_selection property is enabled in this trackbar,
         we need to show the area between thumb and channel starting in diff color.
@@ -452,6 +423,7 @@ function TrackBar:fillChannelRect(nm: LPNMCUSTOMDRAW, trc: RECT): boolean
     return result
 end
 
+--Private function
 function TrackBar:destroy()
 	DeleteObject(self._bkBrush)
 	if self._selBrush ~= nilptr then DeleteObject(self._selBrush) end
@@ -500,7 +472,6 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
                 end
                 this.value = pos
             end
-
             -- We need to refresh Trackbar in order to display our new drawings.
             InvalidateRect(hw, &this._chnRect, 0)
             this.trackChange = TrackChange.MouseDrag
@@ -508,7 +479,6 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             	local ea: EventArgs = {}
             	this.onDragged(this, &ea)
             end
-
             if this.onValueChanged ~= nilptr then
             	local ea: EventArgs = {}
             	this.onValueChanged(this, &ea)
@@ -594,6 +564,5 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             this.trackChange = TrackChange.MouseClick
         end
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end

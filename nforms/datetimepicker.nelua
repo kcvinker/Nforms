@@ -1,5 +1,4 @@
 
-
 -- DateTimePicker module - Created on 15-Mar-2023 06:57 PM
 
 require "nforms.api_messages"
@@ -24,7 +23,6 @@ require "nforms.datetime"
 	local MCN_SELECT <comptime> = MCN_FIRST
 	local MCN_SELCHANGE <comptime> = MCN_FIRST - 3
 	local MCN_VIEWCHANGE <comptime> = MCN_FIRST - 4
-
 
 	local DTM_FIRST <comptime> = 0x1000
 	local DTN_FIRST <comptime> = (0-740)
@@ -57,9 +55,6 @@ require "nforms.datetime"
 	local DTN_DATETIMECHANGE <comptime> = (DTN_FIRST2 - 6) -- the systemtime has changed, -759
 	local DTN_USERSTRINGW <comptime> = (DTN_FIRST - 5) -- -745
 	local DTN_USERSTRING <comptime> = DTN_USERSTRINGW
-	-- local DTN_USERSTRING <comptime> = DTN_USERSTRINGA
-	-- local NMDATETIMESTRING <comptime> = NMDATETIMESTRINGA
-	-- local LPNMDATETIMESTRING <comptime> = LPNMDATETIMESTRINGA
 	local DTN_WMKEYDOWNA <comptime> = (DTN_FIRST2 - 4) -- modify keydown on app format field (X), , -757
 	local DTN_WMKEYDOWNW <comptime> = (DTN_FIRST - 4) -- -744
 	local DTN_WMKEYDOWN <comptime> = DTN_WMKEYDOWNW
@@ -69,15 +64,8 @@ require "nforms.datetime"
 	local DTN_FORMAT <comptime> = DTN_FORMATW
 
 	local DTN_FORMAT <comptime> = DTN_FORMATA
-	-- local NMDATETIMEFORMAT <comptime> = NMDATETIMEFORMATA
-	-- local LPNMDATETIMEFORMAT <comptime> = LPNMDATETIMEFORMATA
 	local DTN_FORMATQUERYW <comptime> = (DTN_FIRST - 2) -- -742
 	local DTN_FORMATQUERY <comptime> = DTN_FORMATQUERYW
-	-- local NMDATETIMEFORMATQUERY <comptime> = NMDATETIMEFORMATQUERYW
-	-- local LPNMDATETIMEFORMATQUERY <comptime> = LPNMDATETIMEFORMATQUERYW
-	-- local DTN_FORMATQUERY <comptime> = DTN_FORMATQUERYA
-	-- local NMDATETIMEFORMATQUERY <comptime> = NMDATETIMEFORMATQUERYA
-	-- local LPNMDATETIMEFORMATQUERY <comptime> = LPNMDATETIMEFORMATQUERYA
 	local DTN_DROPDOWN <comptime> = (DTN_FIRST2 - 1) -- MonthCal has dropped down, -754
 	local DTN_CLOSEUP <comptime> = (DTN_FIRST2) -- MonthCal is popping up, -753
 
@@ -97,14 +85,12 @@ require "nforms.datetime"
 
 --End
 
-
 local dtpNumber = 1
 local function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global DTPFormat = @enum {longDate = 1, shortDate = 2, timeOnly = 4, custom = 8}
 
-global DateTimePicker = @record
-{
+global DateTimePicker = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -118,7 +104,6 @@ global DateTimePicker = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-
     format: DTPFormat,
     formatString: string,
     rightAlign: boolean,
@@ -130,8 +115,6 @@ global DateTimePicker = @record
     noTrailingDates : boolean,
     shortDayNames : boolean,
     showUpdown : boolean,
-
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -145,7 +128,6 @@ global DateTimePicker = @record
     _dwTxtFlag: DWORD,
     _dropDownCount: integer,
     _calStyle: DWORD,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -182,9 +164,7 @@ function DateTimePicker.new(frm : *Form, x: integer, y: integer) : DateTimePicke
 	this._isTextable = false
 	this.backColor = frm.backColor
 	this.foreColor = colorBlack
-
 	this.cid = frm._cidNumber
-
     dtpNumber = dtpNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	if not app.isDateInit then
@@ -195,6 +175,7 @@ function DateTimePicker.new(frm : *Form, x: integer, y: integer) : DateTimePicke
 	return this
 end
 
+--Private function
 function DateTimePicker:setDTPStyles()
 	switch self.format do
     case DTPFormat.custom then
@@ -221,6 +202,7 @@ function DateTimePicker:setDTPStyles()
     if self.showUpdown then self._style = self._style | DTS_UPDOWN end
 end
 
+--Private function
 function DateTimePicker:setSizeAndValue()
 	if self.format == DTPFormat.custom then
 		-- Although we are using 'W' based unicode functions & messages,
@@ -245,6 +227,7 @@ function DateTimePicker:createHandle()
 	end
 end
 
+--Private function
 function DateTimePicker:destroy()
 	print("DateTimePicker destroyed")
 	-- DeleteObject(self._bkBrush)
@@ -269,7 +252,6 @@ function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
-
 	case MM_NOTIFY_REFLECT then
 		local nm = (@LPNMHDR)(lpm)
 		switch nm.code do

@@ -8,15 +8,10 @@ local CLIP_DEFAULT_PRECIS : byte <comptime> = 0
 local DEFAULT_QUALITY : byte <comptime> = 0
 local DEFAULT_PITCH : byte <comptime> = 0
 local LOGPIXELSY : cint = 90
--- local DEFAULT_CHARSET : byte <comptime> = 1
--- local DEFAULT_CHARSET : byte <comptime> = 1
--- local DEFAULT_CHARSET : byte <comptime> = 1
--- local DEFAULT_CHARSET : byte <comptime> = 1
 
 global FontWight = @enum {Thin = 100, ExtraLight = 200, Light = 300, Normal = 400, Medium = 500, SemiBold = 600, Bold = 700, ExtraBold = 800, Thick = 900}
 
-local LOGFONTW : type <cimport,nodecl> = @record 
-{
+local LOGFONTW : type <cimport,nodecl> = @record {
 	lfHeight : LONG,
 	lfWidth : LONG,
 	lfEscapement : LONG,
@@ -39,8 +34,7 @@ local function CreateFontIndirectW(lpLf : LPLOGFONTW): HFONT <cimport,nodecl> en
 local function GetDeviceCaps(hdc: HDC, index: cint) : cint <cimport,nodecl> end
 local function MulDiv(nNumber: cint, nNumerator: cint, nDenominator: cint): cint <cimport,nodecl> end
 
-global Font = @record
-{
+global Font = @record {
 	name: string,
 	size: integer,
 	weight: FontWight,
@@ -58,7 +52,6 @@ function Font.new(fname: string, fsize: integer, fweight: FontWight, ital: boole
 	this.italics = ital
 	this.underline = under
 	this.strikeOut = strike
-
 	return this
 end
 
@@ -74,7 +67,6 @@ function Font:createHandle(hwnd: HWND)
 	ReleaseDC(hwnd, hdc)
 	local fname: [32]WCHAR
 	local wfname = toWstrArray(self.name)
-
 	for i, v in ipairs(wfname.data) do
 		if i > 32 then break end
 		fname[i] =  v
@@ -105,6 +97,7 @@ function Font:createHandleEx(hwnd : HWND)
 	 							DEFAULT_QUALITY, DEFAULT_PITCH, toUTF16(self.name))
 end
 
+--Private function
 function Font:setFontInternal(hwnd: HWND)
 	if self.handle == nilptr then self:createHandle(hwnd) end
 	SendMessageW(hwnd, WM_SETFONT, (@WPARAM)(self.handle), (@LPARAM)(1))

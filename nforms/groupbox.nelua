@@ -1,7 +1,6 @@
 
 -- GroupBox module - Created on 16-Mar-2023 11:54 PM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
@@ -11,18 +10,6 @@ require "nforms.common"
 	local BS_GROUPBOX <comptime> = 0x00000007
 	local BS_NOTIFY <comptime> = 0x00004000
 	local BS_TOP <comptime> = 0x00000400
-	-- local HOLLOW_BRUSH <comptime> = 0
-	-- local ES_WANTRETURN <comptime> = 4096
-	-- local ES_NOHIDESEL <comptime> = 256
-	-- local ES_READONLY <comptime> = 0x800
-	-- local ES_LOWERCASE <comptime> = 16
-	-- local ES_UPPERCASE <comptime> = 8
-
-	-- local ES_NUMBER <comptime> = 0x2000
-	-- local ES_PASSWORD <comptime> = 32
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
 --End
 
 local gbStyle <comptime> = WS_CHILD|WS_VISIBLE|BS_GROUPBOX|BS_NOTIFY|BS_TOP|WS_OVERLAPPED|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
@@ -30,9 +17,7 @@ local gbExStyle <comptime> = WS_EX_RIGHTSCROLLBAR| WS_EX_CONTROLPARENT
 local gbNumber = 1
 local function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-
-global GroupBox = @record
-{
+global GroupBox = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -46,7 +31,6 @@ global GroupBox = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -59,7 +43,6 @@ global GroupBox = @record
 	_bkBrush: HBRUSH,
     _pen: HPEN,
     _txtWidth: integer,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -94,18 +77,18 @@ function GroupBox.new(frm : *Form, txt: string, x: integer, y: integer, w: integ
 	this._isTextable = true
 	this.backColor = frm.backColor
 	this.foreColor = colorBlack
-
     gbNumber = gbNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
+--Private function
 function GroupBox:setBrushAndPen()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
     self._pen = CreatePen(PS_SOLID, 2, self.backColor.ref)
 end
 
-
+--Private function
 function GroupBox:getTextBounds()
     local hdc: HDC = GetDC(self.handle)
     defer ReleaseDC(self.handle, hdc) end
@@ -122,7 +105,6 @@ function GroupBox:createHandle()
 	if self._isCreated then
         setSubClass(self.handle, (pointer)(self), gbWndProc)
         self:getTextBounds()
-        print("gb hwnd ", self.text)
 	end
 end
 
@@ -154,6 +136,7 @@ function GroupBox:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 function GroupBox:drawText()
     local hdc = GetDC(self.handle)
     defer ReleaseDC(self.handle, hdc) end
@@ -169,6 +152,7 @@ function GroupBox:drawText()
     TextOutW(hdc, 10, 0, toUTF16(self.text), #self.text)
 end
 
+--Private function
 function GroupBox:destroy()
 	print("GroupBox destroyed")
 	DeleteObject(self._bkBrush)
@@ -194,7 +178,6 @@ function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
-
     case WM_ERASEBKGND then
         if this._drawFlag > 0 then
             local hdc = (@HDC)(wpm)
@@ -210,8 +193,6 @@ function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
         return ret
 
     case WM_GETTEXTLENGTH then return 0
-
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end

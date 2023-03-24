@@ -1,14 +1,12 @@
 
 -- NumberPicker module - Created on 17-Mar-2023 11:33 AM
 
-
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
 require "nforms.common"
 
 --Constants
-
 	local UDN_FIRST <comptime> = UINT_MAX-721
 	local UDS_WRAP <comptime> = 0x0001
 	local UDS_SETBUDDYINT <comptime> = 0x0002
@@ -31,8 +29,6 @@ require "nforms.common"
 	local UDM_GETBASE <comptime> = (WM_USER+110)
 	local UDM_SETRANGE32 <comptime> = (WM_USER+111)
 	local UDM_GETRANGE32 <comptime> = (WM_USER+112) -- wParam & lParam are LPINT
-	-- local UDM_SETUNICODEFORMAT <comptime> = CCM_SETUNICODEFORMAT
-	-- local UDM_GETUNICODEFORMAT <comptime> = CCM_GETUNICODEFORMAT
 	local UDM_SETPOS32 <comptime> = (WM_USER+113)
 	local UDM_GETPOS32 <comptime> = (WM_USER+114)
 	local UDN_DELTAPOS <comptime> = (UDN_FIRST - 1)
@@ -45,21 +41,14 @@ require "nforms.common"
 
 	local BDR_SUNKENOUTER <comptime> = 0x0002
 	local BDR_RAISEDINNER <comptime> = 0x0004
-	-- local ES_CENTER <comptime> = 1
-	-- local ES_RIGHT <comptime> = 2
-	-- local EM_SETCUEBANNER <comptime> = ECM_FIRST + 1
 --End
 
--- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
--- local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local npNumber = 1
 local swp_flag = SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER
 local function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-
-global NumberPicker = @record
-{
+global NumberPicker = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -85,7 +74,6 @@ global NumberPicker = @record
     formatString: string,
     decimalPrecision: integer,
     trackMouseLeave: boolean, -- Set this true if you want to use mouse enter and/or mouse leave events
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -111,7 +99,6 @@ global NumberPicker = @record
     _dwTxtFlag: DWORD,
     _trackMouseLeave: boolean,
     _keyPressed: boolean,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -122,8 +109,7 @@ global NumberPicker = @record
 	onMouseScroll: MouseEventHandler,
 	onMouseEnter: EventHandler,
 	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	
+	onMouseLeave: EventHandler,	
 	onValueChanged: EventHandler,
 	onKeyDown: KeyEventHandler,
 	onKeyUp: KeyEventHandler,
@@ -158,15 +144,14 @@ function NumberPicker.new(frm : *Form, x: integer, y: integer, w: integer, h: in
 	this.decimalPrecision = 0
 	this.formatString = "%.2f"
 	this.step = 1
-
     npNumber = npNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
 	this._buddyCID = frm._cidNumber
 	frm._cidNumber = frm._cidNumber + 1
-
 	return this
 end
 
+--Private function
 function NumberPicker:setNPStyle()
 	if self.buttonLeft then
         self._style = self._style ~ UDS_ALIGNRIGHT
@@ -185,7 +170,7 @@ function NumberPicker:setNPStyle()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
-
+--Private function
 function NumberPicker:createBuddy()
 	if self.buttonLeft then self.width = self.width - 2 end
     self._buddyHwnd = CreateWindowExW(self._buddyExStyle, toUTF16("Edit"), nilptr, self._buddyStyle,
@@ -197,6 +182,7 @@ function NumberPicker:createBuddy()
 	end
 end
 
+--Private function
 function NumberPicker:resizeBuddy()
 	if self.buttonLeft then
         self._lineX = self._buddyRect.left
@@ -210,6 +196,7 @@ function NumberPicker:resizeBuddy()
     end
 end
 
+--Private function
 function NumberPicker:displayValue()
 	local newStr = string.format(self.formatString, self.value)
 	SetWindowTextW(self._buddyHwnd, toUTF16(newStr))	
@@ -239,6 +226,7 @@ function NumberPicker:createHandle()
 
 end
 
+--Private function
 function NumberPicker:setValueInternal(delta: cint)
 	local newValue : number = self.value + (delta * self.step)
     if self.autoRotate then
@@ -254,16 +242,6 @@ function NumberPicker:setValueInternal(delta: cint)
     end
     self:displayValue()
 end
-
--- function NumberPicker:getText(txt: string): string
--- 	if self._isCreated then
--- 		local wstr = getControlText(self.handle)
--- 		self.text = toUTF8(wstr)
--- 		return self.text
--- 	else
--- 		return self.text
--- 	end
--- end
 
 function NumberPicker:setValue(value: number)
 	self.value = value
@@ -283,6 +261,7 @@ function NumberPicker:setBackColor(clr: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 function NumberPicker:isMouseUponMe(): boolean
 	local pt: POINT
 	GetCursorPos(&pt)
@@ -291,11 +270,13 @@ function NumberPicker:isMouseUponMe(): boolean
 	return ret == 1 and true or false
 end
 
+--Private function
 local function remNullChar(x: wstring): string
 	local u8Str = toUTF8(x)
 	return string.subview(u8Str, 0, #u8Str - 1)
 end
 
+--Private function
 function NumberPicker:destroy()
 	print("NumberPicker destroyed")
 	DeleteObject(self._bkBrush)
@@ -329,19 +310,6 @@ function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
-
-    -- case MM_CTL_COMMAND then
-    --     this.checked = SendMessageW(hw, BM_GETCHECK, 0, 0) == 1 and true or false
-    --     if this.onCheckedChanged ~= nilptr then
-    --         local ea = EventArgs {}
-    --         this.onCheckedChanged(this, &ea)
-    --     end
-
-	-- case MM_LABEL_COLOR then
-    --     local hdc = (HDC)(wpm)
-    --     SetBkColor(hdc, this.backColor.ref)
-	-- 	return (LRESULT)(this._bkBrush)
-
     case MM_NOTIFY_REFLECT then    	
         local nm = (@LPNMUPDOWN)(lpm)        
     	if nm.hdr.code == UDN_DELTAPOS then
@@ -353,17 +321,12 @@ function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             	this.onValueChanged(this, &ea)
             end            
         end
-
     end
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
 
-
-
 function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 	local this = (@*NumberPicker)((pointer)(refData))
-	-- print(string.format("[%d] Edit Message : %d", cnt, msg))
-	-- cnt = cnt + 1
 	switch msg do
 	case WM_DESTROY then
 	    RemoveWindowSubclass(hw, npEditWndProc, scID)

@@ -1,7 +1,5 @@
 
-
 -- TreeView module - Created on 19-Mar-2023 08:32 PM
-
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -77,8 +75,6 @@ local tvNumber = 1
 local function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global NodeOps = @enum {AddNode = 0, InsertNode, AddChild, InsertChild }
--- global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
--- global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
 
 global TreeNode = @record {
 	handle: HTREEITEM,
@@ -98,8 +94,7 @@ global TreeNode = @record {
 	nodes: vector(TreeNode),
 }
 
-global TreeView = @record
-{
+global TreeView = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -112,9 +107,8 @@ global TreeView = @record
 	font: Font,
 	parent : *Form,
 	backColor: Color,
-	foreColor: Color,	
-
-	--TreeView's own properties
+	foreColor: Color,
+	--TreeView's unique properties
 	lineColor: Color,
 	noLine: boolean,
     noButton: boolean,
@@ -125,8 +119,7 @@ global TreeView = @record
 	hotTrack: boolean,
 	nodeCount: integer,
 	selectedNode: TreeNode,
-	nodes: vector(TreeNode),	
-
+	nodes: vector(TreeNode),
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -138,7 +131,6 @@ global TreeView = @record
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
     _uniqNodeID: integer,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -186,6 +178,7 @@ function TreeNode.new(txt: string, img: integer, selImg: integer): *TreeNode
 	return this
 end
 
+--Private function
 function TreeNode.fillData(nodePtr: *TreeNode, txt: string)
 	nodePtr.imageIndex = -1
 	nodePtr.selImageIndex = -1
@@ -218,62 +211,6 @@ end
         	SendMessageW(self.handle, TVM_SETLINECOLOR, 0, (@LPARAM)(self.lineColor.ref))
         end	     
 	end
-
-	-- function TreeView:calculateTics()
-	-- 	-- Calculating logical & physical positions for tics.
-	--     local twidth, numTics, stPos, enPos, channelLen, tic : integer
-	--     local pFactor, range : number
-
-	--     --1. Collecting required rects
-	--     GetClientRect(self.handle, &self._myRect); -- Get TreeView rect
-	--     SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&self._thumbRect)) -- Get the thumb rect
-	--     SendMessageW(self.handle, TBM_GETCHANNELRECT, 0, (@LPARAM)(&self._chnRect)) -- Get the channel rect
-
-	--     --2. Calculate thumb offset
-	--     if self.vertical then
-	--         twidth = self._thumbRect.bottom - self._thumbRect.top
-	--     else
-	--         twidth = self._thumbRect.right - self._thumbRect.left
-	--     end
-
-	--     self._thumbHalf = (@integer)(twidth / 2)
-
-	--     -- Now calculate required variables
-	--     range = self.maxRange - self.minRange
-	--     numTics = (@integer)(range / self.frequency)
-	--     if (range % self.frequency) == 0 then numTics = numTics - 1 end
-	--     stPos = self._chnRect.left + self._thumbHalf
-	--     enPos = self._chnRect.right - self._thumbHalf - 1
-	--     channelLen = enPos - stPos
-	--     pFactor = channelLen / range
-
-	--     tic = self.minRange + self.frequency
-	--     self._ticList:push(TicData{stPos, 0}) -- Very first tic
-	--     for i = 0, < numTics do
-	--         self._ticList:push(TicData{(@integer)((tic * pFactor) + stPos), tic}) -- Middle tics
-	--         tic = tic + self.frequency
-	--     end
-	--     self._ticList:push(TicData{enPos, (@integer)(range)}) -- Last tic
-
-	--     -- Now, set up single point (x/y) for tics.
-	--     if self.vertical then
-	--         switch self.ticPosition do
-	--             case TicPosition.LeftSide then self._p1 = self._thumbRect.left - 5
-	--             case TicPosition.RightSide then self._p1 = self._thumbRect.right + 2
-	--             case TicPosition.BothSide then
-	--                 self._p1 = self._thumbRect.right + 2
-	--                 self._p2 = self._thumbRect.left - 5
-	--         end
-	--     else
-	--         switch self.ticPosition do
-	--             case TicPosition.DownSide then self._p1 = self._thumbRect.bottom + 1
-	--             case TicPosition.UpSide then self._p1 = self._thumbRect.top - 4
-	--             case TicPosition.BothSide then
-	--                 self._p1 = self._thumbRect.bottom + 1
-	--                 self._p2 = self._thumbRect.top - 3
-	--         end
-	--     end
-	-- end
 --End of private funcs
 
 -- Public function
@@ -286,6 +223,7 @@ function TreeView:createHandle()
 	end
 end
 
+--Private function
 local function makeTVInsertStruct(node: *TreeNode) : TVINSERTSTRUCTW
 	local tvi: TVITEMEXW
 	tvi.mask = TVIF_TEXT | TVIF_PARAM
@@ -302,6 +240,7 @@ local function makeTVInsertStruct(node: *TreeNode) : TVINSERTSTRUCTW
 	return tIns
 end
 
+--Private function
 function TreeView:addNodeInernal(nop: NodeOps, node: *TreeNode, pnode: *TreeNode, pos: integer)
 	if not self._isCreated then return end
     node._isCreated = true
@@ -391,7 +330,7 @@ function TreeView:insertChildNodeEx(node: *TreeNode, parentNode: *TreeNode, inde
 	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
 end
 
-
+--Private function
 function TreeView:destroy()
 	DeleteObject(self._bkBrush)	
 	print("TreeView destroyed")

@@ -29,7 +29,6 @@ require 'hashmap'
 	local CS_VREDRAW  : DWORD <comptime> = 0x0001
 	local CS_HREDRAW : DWORD <comptime> = 0x0002
 	local CS_OWNDC  : DWORD <comptime> = 0x0020
-	--global CW_USEDEFAULT : culong  <comptime> = -0x8000000
 
 	--Get window long ptr Constants
 	global GWL_EXSTYLE <comptime> = -20
@@ -91,6 +90,7 @@ require 'hashmap'
 	global WS_EX_NOPARENTNOTIFY : DWORD  <comptime> = 0x00000004
 	global WS_EX_TRANSPARENT : DWORD  <comptime> = 0x00000020
 
+	-- Different window styles 
 	local fixedSingleExStyle: DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
 	local fixedSingleStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
 	local fixed3DExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CLIENTEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW|WS_EX_OVERLAPPEDWINDOW
@@ -106,8 +106,7 @@ require 'hashmap'
 --End of Window constants
 
 -- Just to hold some app level informations.
-local Application = @record
-{
+local Application = @record {
 	started : boolean,
 	mainLoopStarted: boolean,
 	hInstance : HINSTANCE,
@@ -132,9 +131,7 @@ global FormState = @enum {Normal = 0, Maximized, Minimized}
 global FormPosition = @enum {Center = 0, TopLeft, TopMid, TopRight, MidLeft, MidRight, BottomLeft, BottomMid, BottomRight, Manual}
 global FormDrawMode = @enum {Default = 0, FlatColor, Gradient}
 
-global Form = @record
-{
-	-- Public properties
+global Form = @record {
 	name : string,
 	text : string,
 	width : integer,
@@ -153,7 +150,6 @@ global Form = @record
 	style: FormStyle,
 	menuBar: *MenuBar,
 	comboMap : hashmap(HWND, HWND),
-
 	-- Private properties
 	_count: uinteger, -- To know how many forms are there
 	_isCreated: boolean,
@@ -170,7 +166,6 @@ global Form = @record
 	_cidNumber: integer,
 	_menuNumber: integer,
 	_menuList: vector(*MenuItem),
-
 	-- Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -217,7 +212,6 @@ MenuItem = @record {
 	menus: vector(*MenuItem)
 }
 
-
 MenuBar = @record {
 	formPtr: *Form,
 	handle: HMENU,
@@ -245,6 +239,7 @@ function Form.new(title: string, width: integer, height: integer ) : Form --Cons
 	return this
 end
 
+--Private function
 function regWindow()
 	app.className = "NForms_Window_Nelua"
 	app.hInstance = GetModuleHandleW(nilptr)
@@ -264,6 +259,7 @@ function regWindow()
 	local x = RegisterClassExW(&wcEx)
 end
 
+--Private function
 function Form:setStyles()
 	local mxFlag = false
     switch self.style do
@@ -297,16 +293,15 @@ function Form:setStyles()
         self._exStyle = WS_EX_TOOLWINDOW
         self._winStyle = WS_BORDER
     end
-
     if mxFlag then
         if not self.maximizeBox then self._winStyle = self._winStyle ~ WS_MAXIMIZEBOX end
         if not self.minimizeBox then self._winStyle = self._winStyle ~ WS_MINIMIZEBOX end
     end
-
     if self.topMost then self._exStyle = self._exStyle or WS_EX_TOPMOST end
     if self.formState == FormState.Maximized then self._winStyle = self._winStyle|WS_MAXIMIZE end
 end
 
+--Private function
 function Form:setPos()
 	switch self.formPos do
 	case FormPosition.Center then
@@ -328,6 +323,7 @@ function Form:setPos()
     end
 end
 
+--Public function
 function Form:createHandle()
 	--InitCommonControls()
 	if not app.started then
@@ -367,6 +363,7 @@ local function mainLoop()
 	end
 end
 
+--Public function
 function Form:show()
 	ShowWindow(self.handle, SW_SHOW)
 	UpdateWindow(self.handle)
@@ -376,8 +373,6 @@ function Form:show()
 		mainLoop()
 	end
 end
-
-
 
 function Form:hide() ShowWindow(self.handle, SW_HIDE) end
 
@@ -395,6 +390,7 @@ function Form:setGradientBackColor(clr1: uinteger, clr2: uinteger, top2Bottom: b
 	suddenRedraw(self)
 end
 
+--Private function
 function Form:setBKGInternal(wpm: WPARAM) : LRESULT
 	local hdc: HDC = (@HDC)(wpm)
 	local hbr : HBRUSH
@@ -410,6 +406,7 @@ function Form:setBKGInternal(wpm: WPARAM) : LRESULT
 	return 1
 end
 
+--Private function
 function Form:getMenuItem(menuId: UINT): *MenuItem
 	if #self._menuList > 0 then
 		for _,menu in ipairs(self._menuList) do
@@ -623,7 +620,6 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 			return SendMessageW(ctHwnd, MM_CTL_COMMAND, wpm, lpm)
 		end
 
-
 	case WM_ERASEBKGND then
 		if this._drawMode ~= FormDrawMode.Default then return this:setBKGInternal(wpm) end
 
@@ -654,8 +650,6 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 		end
 	case MM_MENU_EVENT then -- When user sets a click event handler for a menu item.
 		this._menuList:push((@*MenuItem)((@pointer)(lpm)))
-
-
 	end
 	return DefWindowProcW(hw, msg, wpm, lpm)
 end
@@ -700,6 +694,7 @@ function MenuBar.new(frm: *Form, items: span(string)): *MenuBar
     return this
 end
 
+--Private function
 function MenuItem:changeType()
 	if self.menuType == MenuType.BaseMenu or self.menuType == MenuType.NormalItem then 
 		self.menuType = MenuType.DropDownItem 
@@ -734,6 +729,7 @@ function MenuItem:addMenus(menulist: span(string))
 	end
 end
 
+--Private function
 function MenuItem:createHandle()
 	switch self.menuType do
 		case MenuType.BaseMenu, MenuType.DropDownItem then

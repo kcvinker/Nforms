@@ -10,11 +10,6 @@ global TextAlign = @enum {Left = 0, Center, Right}
 global colorWhite = Color.new(0xFFFFFF)
 global colorBlack = Color.new(0x000000)
 global UINT_MAX <comptime> = 1 << 32
--- global ULONG_MAX <comptime> = #[primtypes.uint32.max]# + 1 -- #[primtypes.uint64.max]# --1 << 64
-
-
-
-
 
 --My Messages
 	local MM_NUMBER : UINT <comptime> = 9000
@@ -32,7 +27,6 @@ global UINT_MAX <comptime> = 1 << 32
 --End of My Messages
 
 -- Common Constants
-
 	global NM_FIRST <comptime> = UINT_MAX
 	global HDM_FIRST <comptime> = 0x1200
 	global NM_CUSTOMDRAW <comptime> = NM_FIRST-12
@@ -64,7 +58,6 @@ global UINT_MAX <comptime> = 1 << 32
 
 --End
 
-
 global function createControl(ctrl: auto)
 	local ctrlTxt : LPCWSTR = ctrl.text and toUTF16(ctrl.text) or nilptr
 	ctrl.handle = CreateWindowExW(ctrl._exStyle, ctrl.className, ctrlTxt, ctrl._style,
@@ -86,6 +79,7 @@ global function increment(x: auto): auto
 	x = x + 1
 	return x
 end
+
 global function printMsg(txt: string, ms: UINT)
 	local cnt = 1
 	print(string.format("[%d] %s : %d", cnt, txt, ms))
@@ -98,32 +92,36 @@ global function setSubClass(hwnd: HWND, pCtrl: pointer, pFunc: SUBCLASSPROC)
 	subClassID = subClassID + 1
 end
 
+--Package function. Needed to redraw certain controls.
 global function suddenRedraw(ctrl: auto)
 	if ctrl._isCreated then InvalidateRect(ctrl.handle, nilptr, 1) end
 end
 
+--Package function - Same purpose as the above function but slightliy different
 global function invalidateNow(ctrl: auto)
 	if ctrl._isCreated then InvalidateRect(ctrl.handle, nilptr, 0) end
 end
 
+--Package function - Helper function for SendMessageW
 global function sendMsg(ctrl: auto, msg: UINT, wpm: auto, lpm: auto): LRESULT
 	return SendMessageW(ctrl.handle, msg, (@WPARAM)(wpm), (@LPARAM)(lpm))
 end
 
+--Package function
 global function getCRect(c: auto): RECT
 	local rct: RECT
 	GetClientRect(c.handle, &rct)
 	return rct
 end
 
+--Global function. 
 global function toStr(x: auto): string
 	## if x.is_stringy then
         return x
     ## else
         return tostring(x)
     ## end
-end
-	
+end	
 
 --Common event handling functions
 	global function leftMouseDownHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
