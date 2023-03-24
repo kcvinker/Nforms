@@ -4,7 +4,7 @@
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
-require "nforms.common
+require "nforms.common"
 
 --Constants
 	local CBS_DROPDOWNLIST <comptime> = 0x0003

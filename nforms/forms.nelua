@@ -22,7 +22,6 @@ require "nforms.apifuncs"
 require "nforms.color"
 require "nforms.font"
 require "nforms.common"
-require "nforms.menubar"
 require 'hashmap'
 
 --Window constants
@@ -284,7 +283,6 @@ function Form:setStyles()
     case FormStyle.Sizable then
         self._exStyle = normalWinExStyle
         self._winStyle = normalWinExStyle|WS_OVERLAPPEDWINDOW
-        print("my style")
     case FormStyle.SizableTool then
         self._exStyle = sizableToolExStyle
         self._winStyle = sizableToolStyle -- con.WS_OVERLAPPEDWINDOW

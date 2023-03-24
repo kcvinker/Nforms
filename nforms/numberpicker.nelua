@@ -221,9 +221,6 @@ function NumberPicker:createHandle()
             if oldBuddy ~= nilptr then SendMessageW(oldBuddy, MM_BUDDY_RESIZE, 0, 0) end
 		end
 	end	
-	local xp = 1 << 32
-	print("xppp  ", xp) -- 4294966574, 4294967296
-
 end
 
 --Private function
