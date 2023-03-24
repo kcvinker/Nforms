@@ -12,28 +12,12 @@
 	Button:setBackColor() - Set back ground color
 	Button:setGradientColor() - Set gradient back ground
 
-
-
-
 ]]
 
-
-
-##[[
-cinclude "<windows.h>"
---cinclude "<commctrl.h>"
-]]
-
-
---require "nforms.api_constants"
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
 require "nforms.common"
-
-
-local button_count : integer
-local subclass_id : integer = 1001
 
 local BS_NOTIFY <comptime> = 0x00004000
 local BS_DEFPUSHBUTTON <comptime> = 0x00000001
@@ -43,9 +27,12 @@ local b_txt_flag : UINT <comptime> = DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT
 local mouse_clicked: DWORD_PTR = 0b1
 local mouse_over: DWORD_PTR = 0b1000000
 local btn_round_factor: cint = 5
+local btnNumber = 1
+-- local btnClassName : []WCHAR = {66, 85, 84, 84, 79, 78, 0} --BUTTON -- I dropped this idea.
+
 local function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN}
+local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN} -- Flat color 
 local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN} -- GradColor is declared in commons
 
 
@@ -55,6 +42,7 @@ global Button = @record
 	className: LPCWSTR,
 	text : string,
 	handle : HWND,
+	cid: integer,
 	width : integer,
 	height : integer,
 	xpos : integer,
@@ -63,8 +51,7 @@ global Button = @record
 	parent : *Form,
 	backColor: Color,
 	foreColor: Color,
-
-
+	--Privates
 	_isCreated: boolean,
 	_isTextable: boolean,
 	_style: DWORD,
@@ -75,8 +62,7 @@ global Button = @record
 	_drawFlag: uinteger,
 	_fdraw: FlatDraw,
 	_gdraw: GradDraw,
-
-
+	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
 	onClick: EventHandler,
@@ -92,7 +78,7 @@ global Button = @record
 -- Public function
 function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Button
 	local this : Button
-	this.name = "Button_1"
+	this.name = string.format("Button_%d", btnNumber)
 	this.className = toUTF16("Button")
 	this.text = txt == "" and this.name or txt
 	this.width = w == 0 and 120 or w
@@ -104,10 +90,13 @@ function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer
 	this._style = WS_CHILD | WS_TABSTOP | WS_VISIBLE | BS_NOTIFY
 	this._exStyle = 0
 	this._isTextable = true
-
+	this.cid = frm._cidNumber
+	btnNumber = btnNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
 	return this
 end
 
+--Private function
 function FlatDraw:init(clr: Color)
 	self.defBrush = CreateSolidBrush(clr.ref)
 	self.hotBrush = CreateSolidBrush(clr:getHotColor2(25).ref)
@@ -115,6 +104,7 @@ function FlatDraw:init(clr: Color)
 	self.hotPen = CreatePen(PS_SOLID, 1, clr:getHotColor(0.3).ref)
 end
 
+--Private function
 function GradDraw:init(c1: uinteger, c2: uinteger)
 	self.defGC.c1 = Color.new(c1)
 	self.defGC.c2 = Color.new(c2)
@@ -129,6 +119,7 @@ function GradDraw:init(c1: uinteger, c2: uinteger)
 	self.hotPen = CreatePen(PS_SOLID, 1, self.defGC.c1:getHotColor(0.3).ref)
 end
 
+--Private function
 function FlatDraw:destroy()
 	if self.defBrush ~= nilptr then DeleteObject(self.defBrush) end
 	if self.hotBrush ~= nilptr then DeleteObject(self.hotBrush) end
@@ -137,6 +128,7 @@ function FlatDraw:destroy()
 	print("flat draw resources destroyed")
 end
 
+--Private function
 function GradDraw:destroy()
 	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
 	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
@@ -146,16 +138,9 @@ end
 
 -- Public function
 function Button:createHandle()
-
 	createControl(self)
-	-- self.handle = CreateWindowExW(b_ex_style,
-    --                             self.className,
-    --                             toUTF16(self.text),
-    --                             b_style, self.xpos, self.ypos, self.width, self.height,
-    --                             self.parent.handle, nilptr, self.parent.hInstance, nilptr)
 	if self._isCreated then
 		setSubClass(self.handle, (pointer)(self), btnWndProc)
-
 	end
 end
 
@@ -164,10 +149,7 @@ function Button:setText(txt: string)
 	if self._isCreated then	setControlText(self.handle, txt) end
 end
 
--- function Button.createHandles(... : varargs)
-
-
-
+--Private function
 function Button:destroy()
 	switch self._drawFlag do
 	case 2, 3 then self._fdraw:destroy()
@@ -197,6 +179,7 @@ function Button:setGradientColor(clr1: uinteger, clr2: uinteger)
 	invalidateNow(self)
 end
 
+--Private function
 local function setBtnForColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESULT
 	SetTextColor(nmcd.hdc, this.foreColor.ref)
 	SetBkMode(nmcd.hdc, 1)
@@ -204,6 +187,7 @@ local function setBtnForColorInternal(this: *Button, nmcd: *NMCUSTOMDRAW): LRESU
 	return CDRF_NOTIFYPOSTPAINT
 end
 
+--Private function
 local function paintFlatButton(hdc: HDC, rc: RECT, hbr: HBRUSH, pen: HPEN)
 	SelectObject(hdc, hbr)
 	SelectObject(hdc, pen)
@@ -214,7 +198,6 @@ end
 local function paintGradientButton(hdc: HDC, rc: RECT, gc: GradColor, pen: HPEN)
 	local gBrush: HBRUSH = createGradientBrush(hdc, rc, gc.c1, gc.c2, true)
 	defer DeleteObject(gBrush) end
-
 	SelectObject(hdc, pen)
 	SelectObject(hdc, gBrush)
 	RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, btn_round_factor, btn_round_factor)
@@ -265,7 +248,9 @@ local function btnWmNotifyHandler(this: *Button, lp: LPARAM): LRESULT
 				setBtnBackColorInternal(this, nmcd)
 				return setBtnForColorInternal(this, nmcd)
 			case 4 then return setBtnGradientColorInternal(this, nmcd)
-			-- case 5 then
+			case 5 then
+				setBtnGradientColorInternal(this, nmcd)
+				return setBtnForColorInternal(this, nmcd)
 		end
 	end
 	return ret
@@ -287,11 +272,7 @@ function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
-
 	case MM_NOTIFY_REFLECT then	return btnWmNotifyHandler(this, lpm)
-
-
 	end
-
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
