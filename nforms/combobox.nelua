@@ -4,8 +4,7 @@
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.forms"
-require "nforms.common"
--- require 'hashmap'
+require "nforms.common
 
 --Constants
 	local CBS_DROPDOWNLIST <comptime> = 0x0003
@@ -27,16 +26,13 @@ require "nforms.common"
 	local CBN_CLOSEUP <comptime> = 0x08
 	local CBN_SELENDOK <comptime> = 0x09
 	local CBN_SELENDCANCEL <comptime> = 0x0A
-
 --End
-
 
 local cmbNumber = 1
 local function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global ComboBox = @record
-{
+global ComboBox = @record {
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -53,7 +49,6 @@ global ComboBox = @record
     items: vector(string),
     selectedIndex: integer,
     enableInput: boolean,
-
 	--Private fields
 	_isCreated: boolean,
 	_isTextable: boolean,
@@ -67,7 +62,6 @@ global ComboBox = @record
 	_bkBrush: HBRUSH,
     _oldHwnd: HWND,
     _dwTxtFlag: UINT,
-
 	--Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -116,6 +110,7 @@ function ComboBox.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	return this
 end
 
+--Private function
 function ComboBox:setCbStyle()
 	if self.enableInput then
 		self._style = self._style |CBS_DROPDOWN
@@ -125,17 +120,16 @@ function ComboBox:setCbStyle()
 	if self._bkBrush == nilptr then self._bkBrush = CreateSolidBrush(self.backColor.ref) end
 end
 
+--Private function
 function ComboBox:afterCreationJobs()
 	self._oldHwnd = self.handle
 	setSubClass(self.handle, (pointer)(self), cmbWndProc)
-
 	local cmbInfo: COMBOBOXINFO
 	cmbInfo.cbSize = #COMBOBOXINFO
 	SendMessageW(self.handle, CB_GETCOMBOBOXINFO, 0, (LPARAM)(&cmbInfo))
 	self.parent.comboMap[cmbInfo.hwndList] = self.handle -- Put the handle in parent's dic
 	SetWindowSubclass(cmbInfo.hwndItem, &cmbEditWndProc, subClassID, (@DWORD_PTR)(self))
 	subClassID = subClassID + 1
-
 	if self.items.size > 0 then
 		for _, item in ipairs(self.items) do
 			SendMessageW(self.handle, CB_ADDSTRING, 0, (@LPARAM)(toUTF16(item)))
@@ -201,6 +195,7 @@ function ComboBox:getSelectedItem(): string
 	return result
 end
 
+--Private function
 function ComboBox:resetStyleBits()
 	if (self._style & CBS_DROPDOWNLIST) == CBS_DROPDOWNLIST then
 		self._style = self._style ~ CBS_DROPDOWNLIST
@@ -210,6 +205,7 @@ function ComboBox:resetStyleBits()
 	end
 end
 
+--Public function
 function ComboBox:changeStyle()
 	self.enableInput = not self.enableInput
 	if self._isCreated then
@@ -273,6 +269,7 @@ local function getMousePoints(): POINT
 	return p
 end
 
+--Private function
 function ComboBox:isInComboRect(hwnd: HWND): boolean
 	local rc : RECT
 	GetWindowRect(hwnd, &rc)
@@ -281,6 +278,7 @@ function ComboBox:isInComboRect(hwnd: HWND): boolean
 	return bRes
 end
 
+--Private function
 function ComboBox:mouseLeaveHandler(hwnd: HWND) : LRESULT
 	if self.enableInput then
 		if self:isInComboRect(hwnd) then
@@ -300,8 +298,7 @@ function ComboBox:mouseLeaveHandler(hwnd: HWND) : LRESULT
 	return 0
 end
 
-
-
+--Private function
 function ComboBox:destroy()
 	print("ComboBox destroyed")
 	DeleteObject(self._bkBrush)
@@ -326,7 +323,6 @@ function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
-
 	case MM_LIST_COLOR then
 		if this._drawFlag > 0 then
 			local hdc = (HDC)(wpm)
@@ -399,7 +395,6 @@ function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UIN
 	case WM_KEYDOWN then keyDownHandler(this, wpm)
 	case WM_KEYUP then keyUpHandler(this, wpm)
 	case WM_CHAR then keyPressHandler(this, wpm)
-
 	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
 	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
 	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
@@ -408,7 +403,6 @@ function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UIN
 	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
-
 	case MM_EDIT_COLOR then
 		if this._drawFlag > 0 then
 			local hdc = (@HDC)(wpm)
