@@ -28,14 +28,14 @@ b3:createHandle()
 local function btnClick(bn: pointer, e: *EventArgs)
 	local bt = (@*Button)(bn) // Normally we don't need this here. Just for displaying the feature.
 	print("btn clicked ", bt.text)
-end  
+end
 b.onClick = &btnClick // Connect click event to button
 
 frm:show()
 
 ```
 
-## Screenshot 
+## Screenshot
 
 ![image](https://user-images.githubusercontent.com/8840907/227059551-662c51a7-ed4a-4b1b-88e9-a1fc87c755e4.png)
 
@@ -125,3 +125,11 @@ lv:addRows("Sam", "Accountabt", 15000)
 lv:addRows("Jerome", "Clerk", 9000)
 f:show()
 ```
+
+## NOTE
+
+This library is written and tested in x64 Windows platform.
+To get the native visual styles, you need the manifest file in your exe file's location.
+A sample manifest file is here in this repo. You can use it. But remember one thing.
+Manifest file's name must match your exe file's name. i.e, If your exe file's name is
+`app.exe`, your manifest file must have named `app.exe.manifest`.
