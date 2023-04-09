@@ -492,6 +492,7 @@ global function GetCursorPos(lpPoing: LPPOINT): BOOL <cimport,nodecl> end
 global function ScreenToClient(hWnd: HWND, lpPoing: LPPOINT): BOOL <cimport,nodecl> end
 global function HideCaret(hWnd: HWND): BOOL <cimport,nodecl> end
 global function DrawEdge(hdc: HDC, qrc: LPRECT, edge: UINT, grfFlags: UINT): BOOL <cimport,nodecl> end
+-- global function SetWindowLongPtrW(hWnd: HWND, nIndex: int32, dwNewLong: LONG_PTR): LONG_PTR <cimport,nodecl> end
 
 
 

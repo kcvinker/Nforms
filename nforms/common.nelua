@@ -133,13 +133,22 @@ end
 	end
 
 	global function leftMouseUpHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
-		if this._lbDown then
-			this._lbDown = false
-			PostMessageW(this.handle, MM_MOUSE_LB_CLICK, 0, 0)
-		end
+		
 		if this.onMouseUp ~= nilptr then
 			local mea = MouseEventArgs.new(msg, wp, lp)
 			this.onMouseUp(this, &mea)
+		end
+		-- if this._lbDown then
+		-- 	this._lbDown = false
+		-- 	-- PostMessageW(this.handle, MM_MOUSE_LB_CLICK, 0, 0)
+
+		-- end
+		if this.onClick ~= nilptr then
+			if this._lbDown then
+				this._lbDown = false
+				local ea : EventArgs = {}
+				this.onClick(this, &ea)
+			end
 		end
 	end
 
