@@ -1,0 +1,239 @@
+
+-- progressbar module - Created on 09-Apr-2023 07:55 PM
+
+require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.forms"
+require "nforms.common"
+
+--Constants
+	local PBS_SMOOTH <comptime> = 0x01
+	local PBS_VERTICAL <comptime> = 0x04
+	local PBS_MARQUEE <comptime> = 0x08
+	local PBST_NORMAL <comptime> = 0x0001
+	local PBST_ERROR <comptime> = 0x0002
+	local PBST_PAUSED <comptime> = 0x0003
+	local PBM_SETPOS <comptime> = (WM_USER+2)
+	local PBM_SETSTEP <comptime> = (WM_USER+4)
+	local PBM_STEPIT <comptime> = (WM_USER+5)
+	local PBM_SETRANGE32 <comptime> = (WM_USER+6)
+	local PBM_GETPOS <comptime> = (WM_USER+8)
+	local PBM_SETMARQUEE <comptime> = (WM_USER+10)
+	local PBM_SETSTATE  <comptime> = (WM_USER+16)
+--End
+
+local pbStyle <comptime> =  WS_VISIBLE | WS_CHILD 
+local lbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
+local pbNumber = 1
+local function pbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
+
+global ProgressBarState = @enum { none = 0, normal, error, paused }
+global ProgressBarStyle = @enum { block = 0, marquee }
+
+global ProgressBar = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	barState: ProgressBarState,
+    barStyle: ProgressBarStyle,
+    vertical: boolean,
+    showPercentage: boolean,
+    minValue: integer,
+    maxValue: integer,
+    step: integer,
+    value: integer,
+    marqueeSpeed: integer,
+        
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+
+-- Public function
+function ProgressBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ProgressBar
+	local this : ProgressBar
+	this.name = string.format("ProgressBar_%d", pbNumber)
+	this.className = toUTF16("msctls_progress32")
+	this.width = w == 0 and 230 or w
+	this.height = h == 0 and 25 or h
+	this.xpos = x == 0 and 20 or x
+	this.ypos = y == 0 and 20 or y
+	this.font = frm.font
+	this.parent = frm
+	this._style = pbStyle
+	this._exStyle = 0
+	this._isTextable = false
+	this.backColor = frm.backColor
+	this.foreColor = colorBlack
+    this.minValue = 0
+    this.maxValue = 100
+    this.step = 1
+    this.barState = ProgressBarState.normal
+    this.barStyle = ProgressBarStyle.block
+    this.marqueeSpeed = 30
+	this.cid = frm._cidNumber
+    pbNumber = pbNumber + 1
+	frm._cidNumber = frm._cidNumber + 1
+	return this
+end
+
+--Private function
+function ProgressBar:setPBStyles()
+	if self.barStyle == ProgressBarStyle.marquee then self._style = self._style | PBS_MARQUEE end
+    if self.vertical then self._style = self._style | PBS_VERTICAL end
+end
+
+
+-- Public function
+function ProgressBar:createHandle()
+	self:setPBStyles()
+	createControl(self)
+	if self._isCreated then
+		setSubClass(self.handle, (pointer)(self), pbWndProc)
+		SendMessageW(self.handle, PBM_SETRANGE32, (@WPARAM)(self.minValue), (@LPARAM)(self.maxValue))
+        SendMessageW(self.handle, PBM_SETSTEP, (@WPARAM)(self.step), 0)
+	end
+end
+
+function ProgressBar:increment()
+    if self._isCreated then
+        self.value = self.value == self.maxValue and self.step or self.value + self.step
+        SendMessageW(self.handle, PBM_STEPIT, 0, 0)
+    end
+end
+
+function ProgressBar:startMarquee()
+    if self._isCreated and self.barStyle == ProgressBarStyle.marquee then
+		SendMessageW(self.handle, PBM_SETMARQUEE, (@WPARAM)(1), (@LPARAM)(self.marqueeSpeed))
+	end
+end
+
+function ProgressBar:stopMarquee()
+    if self._isCreated and self.barStyle == ProgressBarStyle.marquee then
+		SendMessageW(self.handle, PBM_SETMARQUEE, 0, (@LPARAM)(self.marqueeSpeed))
+	end
+end
+
+function ProgressBar:setValue(ivalue: integer)
+    if ivalue >= self.minValue and ivalue <= self.maxValue then
+        self.value = ivalue
+        if self._isCreated then SendMessageW(self.handle, PBM_SETPOS, (@WPARAM)(ivalue), 0) end
+    else
+        print("value is not in between minValue & maxValue")
+    end
+end
+
+function ProgressBar:setStyle(value: ProgressBarStyle)
+    if self._isCreated and self.barStyle ~= value then
+        self.value = 0
+        if value == ProgressBarStyle.block then
+            self._style = self._style ~ PBS_MARQUEE
+            self._style = self._style | PBS_SMOOTH
+        else
+            self._style = self._style ~ PBS_SMOOTH
+            self._style = self._style | PBS_MARQUEE
+        end
+    end
+    SetWindowLongPtrW(self.handle, GWL_STYLE, (@LONG_PTR)(self._style))
+    if value == ProgressBarStyle.marquee then 
+    	SendMessageW(self.handle, PBM_SETMARQUEE, (@WPARAM)(1), (@LPARAM)(self.marqueeSpeed))
+    end	
+    self.barStyle = value
+end	
+
+function ProgressBar:setStep(value: integer)
+    if value >= self.minValue and value <= self.maxValue then
+        self.step = value
+        if self._isCreated then 
+        	SendMessageW(self.handle, PBM_SETSTEP, (@WPARAM)(self.step), 0)
+        end
+    else
+        print("value is not in between minValue & maxValue")
+    end
+end
+
+function ProgressBar:setState(value: ProgressBarState)
+    self.barState = value
+    if self._isCreated then 
+    	SendMessageW(self.handle, PBM_SETSTATE, (@WPARAM)((@integer)((value))), 0)
+    end
+end
+
+--Private function
+function ProgressBar:destroy()
+	print("ProgressBar destroyed")
+	DeleteObject(self._bkBrush)
+end
+
+function pbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+	local this = (@*ProgressBar)((pointer)(refData))
+	switch msg do
+	case WM_DESTROY then
+	    RemoveWindowSubclass(hw, pbWndProc, scID)
+		this:destroy()
+
+	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
+	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
+	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
+	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
+	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
+	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case WM_PAINT then
+        if this.showPercentage and this.barStyle == ProgressBarStyle.marquee then
+            DefSubclassProc(hw, msg, wpm, lpm)
+            local ss: SIZE
+            local vtext = string.format("%d%%", this.value)
+            local wtext = toUTF16(vtext)
+            local hdc: HDC = GetDC(hw)
+            defer ReleaseDC(hw, hdc) end
+            SelectObject(hdc, this.font.handle)
+            GetTextExtentPoint32W(hdc, wtext, #vtext, &ss)
+            local x = (@integer)((this.width - ss.cx) / 2)
+            local y = (@integer)((this.height - ss.cy) / 2)
+            SetBkMode(hdc, 1)
+            SetTextColor(hdc, this.foreColor.ref)
+            TextOutW(hdc, x, y, wtext, #vtext)            
+            return 0
+        else
+            return DefSubclassProc(hw, msg, wpm, lpm)
+        end
+	end
+	return DefSubclassProc(hw, msg, wpm, lpm)
+end
