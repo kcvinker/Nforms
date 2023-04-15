@@ -74,8 +74,8 @@ require "nforms.common"
 	local TBCD_TICS <comptime> = 0x1
 	local TBCD_THUMB <comptime> = 0x2
 	local TBCD_CHANNEL <comptime> = 0x3
-	local TRBN_THUMBPOSCHANGING <comptime> = TRBN_FIRST-1	
-	
+	local TRBN_THUMBPOSCHANGING <comptime> = TRBN_FIRST-1
+
 	local THUMB_LINE_LOW <comptime> = 0
 	local THUMB_LINE_HIGH <comptime> = 1
 	local THUMB_PAGE_LOW <comptime> = 2
@@ -165,19 +165,21 @@ global TrackBar = @record {
 	onMouseScroll: MouseEventHandler,
 	onMouseEnter: EventHandler,
 	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,	
+	onMouseLeave: EventHandler,
 	onValueChanged: EventHandler,
 	onDragging: EventHandler,
-	onDragged: EventHandler,	
+	onDragged: EventHandler,
 }
 
+function TrackBar:createHandle() <forwarddecl> end
+
 -- Public Constructor
-function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : TrackBar
+function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer, bCreate: boolean) : TrackBar
 	local this : TrackBar
 	this.name = string.format("TrackBar_%d", tkNumber)
 	this.className = toUTF16("msctls_trackbar32")
 	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 45 or h
+	this.height = h == 0 and 38 or h
 	this.xpos = x == 0 and 20 or x
 	this.ypos = y == 0 and 20 or y
 	this.font = frm.font
@@ -186,11 +188,11 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this._style = WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS
 	this._exStyle = WS_EX_RIGHTSCROLLBAR | WS_EX_LTRREADING |WS_EX_LEFT
 	this.backColor = frm.backColor
-	this.foreColor = colorBlack   
+	this.foreColor = colorBlack
     this._chnFlag = BF_RECT | BF_ADJUST
     this.ticWidth = 1
     this.ticLength = 4
-    this.lineSize = 1 
+    this.lineSize = 1
     this.minRange = 0
     this.maxRange = 100
     this.frequency = 10
@@ -203,6 +205,7 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this.selectionColor = Color.new(0x99ff33)
     tkNumber = tkNumber + 1
 	frm._cidNumber = frm._cidNumber + 1
+	if bCreate then this:createHandle() end
 	return this
 end
 
@@ -222,7 +225,7 @@ end
 	            case TicPosition.BothSide then self._style = self._style | TBS_BOTH
 	        end
 	    end
-	    if self.selectionRange then 
+	    if self.selectionRange then
 	    	self._style = self._style | TBS_ENABLESELRANGE
 	    	self._chnFlag = BF_RECT | BF_ADJUST | BF_FLAT
 	    end
@@ -241,15 +244,15 @@ end
 
 	function TrackBar:sendInitialMessages()
 	    if self.reversed then
-	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.maxRange * -1)) 
-	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.minRange) 
+	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.maxRange * -1))
+	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.minRange)
 	    else
-	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.minRange)) 
-	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.maxRange) 
+	        SendMessageW(self.handle, TBM_SETRANGEMIN, 1, (self.minRange))
+	        SendMessageW(self.handle, TBM_SETRANGEMAX, 1, self.maxRange)
 	    end
-	    SendMessageW(self.handle, TBM_SETTICFREQ, self.frequency, 0) 
-	    SendMessageW(self.handle, TBM_SETPAGESIZE, 0, self.pageSize) 
-	    SendMessageW(self.handle, TBM_SETLINESIZE, 0, self.lineSize) 
+	    SendMessageW(self.handle, TBM_SETTICFREQ, self.frequency, 0)
+	    SendMessageW(self.handle, TBM_SETPAGESIZE, 0, self.pageSize)
+	    SendMessageW(self.handle, TBM_SETLINESIZE, 0, self.lineSize)
 	end
 
 	function TrackBar:calculateTics()
@@ -310,127 +313,153 @@ end
 --End of private funcs
 
 -- Public function
-function TrackBar:createHandle()
-	self:setTkStyle()
-	createControl(self)
-	if self._isCreated then
-		setSubClass(self.handle, (pointer)(self), tkWndProc)
-        if self.customDraw then self:prepareCustDraw() end
-        self:sendInitialMessages()
-        if self.customDraw then self:calculateTics() end
-        if self.selectionRange then
-        	self._selBrush = CreateSolidBrush(self.selectionColor.ref)
-        end		
+	function TrackBar:createHandle()
+		self:setTkStyle()
+		createControl(self)
+		if self._isCreated then
+			setSubClass(self.handle, (pointer)(self), tkWndProc)
+	        if self.customDraw then self:prepareCustDraw() end
+	        self:sendInitialMessages()
+	        if self.customDraw then self:calculateTics() end
+	        if self.selectionRange then
+	        	self._selBrush = CreateSolidBrush(self.selectionColor.ref)
+	        end
+		end
 	end
-end
+
+	function TrackBar:setBackColor(clr: uinteger)
+		-- local isOkay = false
+		-- local tname = #[clr.type.name]#
+		-- local tnick = #[clr.type.nickname]#
+		-- if tname == 'int64' then
+		-- 	self.backColor:updateColor(clr)
+		-- 	isOkay = true
+		-- elseif 'record' then
+		-- 	if tnick == 'Color' then
+		-- 		self.backColor = clr
+		-- 		isOkay = true
+		-- 	end
+		-- end
+		-- if isOkay then
+		self.backColor:updateColor(clr)
+		self._bkBrush = CreateSolidBrush(self.backColor.ref)
+		if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+		SendMessageW(self.handle, TBM_SETRANGEMAX, 1, (@LPARAM)(self.maxRange))
+		InvalidateRect(self.handle, nilptr, 0)
+	end
+
+-- End public function
 
 --Private function
-function TrackBar:setupValueInternal(iValue: integer)
-	if self.reversed then
-        self.value = U16_MAX - iValue
-    else
-       	self.value = iValue
-    end
-end
+	function TrackBar:setupValueInternal(iValue: integer)
+		if self.reversed then
+	        self.value = U16_MAX - iValue
+	    else
+	       	self.value = iValue
+	    end
+	end
 
---Private function
-function TrackBar:drawVerticalTics(hdc: HDC, px: integer, py: integer)
-	MoveToEx(hdc, px, py, nilptr)
-    LineTo(hdc, px + self.ticLength, py)
-end
+	--Private function
+	function TrackBar:drawVerticalTics(hdc: HDC, px: integer, py: integer)
+		MoveToEx(hdc, px, py, nilptr)
+	    LineTo(hdc, px + self.ticLength, py)
+	end
 
---Private function
-function TrackBar:drawHorizontalTicsDown(hdc: HDC, px: integer, py: integer)
-	MoveToEx(hdc, px, py, nilptr)
-    LineTo(hdc, px, py + self.ticLength)
-end
+	--Private function
+	function TrackBar:drawHorizontalTicsDown(hdc: HDC, px: integer, py: integer)
+		MoveToEx(hdc, px, py, nilptr)
+	    LineTo(hdc, px, py + self.ticLength)
+	end
 
---Private function
-function TrackBar:drawHorizontalTicsUpper(hdc: HDC, px: integer, py: integer)
-	MoveToEx(hdc, px, py, nilptr)
-    LineTo(hdc, px, py - self.ticLength)
-end
+	--Private function
+	function TrackBar:drawHorizontalTicsUpper(hdc: HDC, px: integer, py: integer)
+		MoveToEx(hdc, px, py, nilptr)
+	    LineTo(hdc, px, py - self.ticLength)
+	end
 
---Private function
-function TrackBar:drawTics(hdc: HDC)
-	SelectObject(hdc, self._ticPen)
-    if self.vertical then
-        switch self.ticPosition do
-        case TicPosition.RightSide, TicPosition.LeftSide then
-            for _,p in ipairs(self._ticList) do 
-            	self:drawVerticalTics(hdc, self._p1, p.phyPoint) 
-            end
-        case TicPosition.BothSide then
-            for _,p in ipairs(self._ticList) do
-                self:drawVerticalTics(hdc, self._p1, p.phyPoint)
-                self:drawVerticalTics(hdc, self._p2, p.phyPoint)
-            end
-       	end
-    else
-        switch self.ticPosition do
-        case TicPosition.UpSide, TicPosition.DownSide then
-            for _,p in ipairs(self._ticList) do
-            	self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
-            end
-        case TicPosition.BothSide then
-            for _,p in ipairs(self._ticList) do
-                self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
-                self:drawHorizontalTicsUpper(hdc, p.phyPoint, self._p2)
-            end
-    	end
-    end
-end
+	--Private function
+	function TrackBar:drawTics(hdc: HDC)
+		SelectObject(hdc, self._ticPen)
+	    if self.vertical then
+	        switch self.ticPosition do
+	        case TicPosition.RightSide, TicPosition.LeftSide then
+	            for _,p in ipairs(self._ticList) do
+	            	self:drawVerticalTics(hdc, self._p1, p.phyPoint)
+	            end
+	        case TicPosition.BothSide then
+	            for _,p in ipairs(self._ticList) do
+	                self:drawVerticalTics(hdc, self._p1, p.phyPoint)
+	                self:drawVerticalTics(hdc, self._p2, p.phyPoint)
+	            end
+	       	end
+	    else
+	        switch self.ticPosition do
+	        case TicPosition.UpSide, TicPosition.DownSide then
+	            for _,p in ipairs(self._ticList) do
+	            	self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
+	            end
+	        case TicPosition.BothSide then
+	            for _,p in ipairs(self._ticList) do
+	                self:drawHorizontalTicsDown(hdc, p.phyPoint, self._p1)
+	                self:drawHorizontalTicsUpper(hdc, p.phyPoint, self._p2)
+	            end
+	    	end
+	    end
+	end
 
---Private function
-function TrackBar:getThumbRect()
-	local rct : RECT
-	SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&rct))
-	return rct
-end
+	--Private function
+	function TrackBar:getThumbRect()
+		local rct : RECT
+		SendMessageW(self.handle, TBM_GETTHUMBRECT, 0, (@LPARAM)(&rct))
+		return rct
+	end
 
---Private function
-function TrackBar:fillChannelRect(nm: LPNMCUSTOMDRAW, trc: RECT): boolean
-	--[[  If show_selection property is enabled in this trackbar,
-        we need to show the area between thumb and channel starting in diff color.
-        But we need to check if the trackbar is reversed or not.
-        NOTE: If we change the drawing flags for DrawEdge function in channel drawing area,
-        We need to reduce the rect size 1 point. Because, current flags working perfectly...
-        Without adsting rect. So change it carefully. ]]--
-    local result = false
-    local rct: RECT
-    if self.vertical then
-        rct.left = nm.rc.left
-        rct.right = nm.rc.right
-        if self.reversed then
-            rct.top = trc.bottom
-            rct.bottom = nm.rc.bottom
-        else
-            rct.top = nm.rc.top
-            rct.bottom = trc.top
-        end
-    else
-        rct.top = nm.rc.top
-        rct.bottom = nm.rc.bottom
-        if self.reversed then
-            rct.left = trc.right
-            rct.right = nm.rc.right
-        else
-            rct.left = nm.rc.left
-            rct.right = trc.left
-        end
-    end
-    result = FillRect(nm.hdc, &rct, self._selBrush) == 1 and true or false
-    return result
-end
+	--Private function
+	function TrackBar:fillChannelRect(nm: LPNMCUSTOMDRAW, trc: RECT): boolean
+		--[[  If show_selection property is enabled in this trackbar,
+	        we need to show the area between thumb and channel starting in diff color.
+	        But we need to check if the trackbar is reversed or not.
+	        NOTE: If we change the drawing flags for DrawEdge function in channel drawing area,
+	        We need to reduce the rect size 1 point. Because, current flags working perfectly...
+	        Without adsting rect. So change it carefully. ]]--
+	    local result = false
+	    local rct: RECT
+	    if self.vertical then
+	        rct.left = nm.rc.left
+	        rct.right = nm.rc.right
+	        if self.reversed then
+	            rct.top = trc.bottom
+	            rct.bottom = nm.rc.bottom
+	        else
+	            rct.top = nm.rc.top
+	            rct.bottom = trc.top
+	        end
+	    else
+	        rct.top = nm.rc.top
+	        rct.bottom = nm.rc.bottom
+	        if self.reversed then
+	            rct.left = trc.right
+	            rct.right = nm.rc.right
+	        else
+	            rct.left = nm.rc.left
+	            rct.right = trc.left
+	        end
+	    end
+	    result = FillRect(nm.hdc, &rct, self._selBrush) == 1 and true or false
+	    return result
+	end
 
---Private function
-function TrackBar:destroy()
-	DeleteObject(self._bkBrush)
-	if self._selBrush ~= nilptr then DeleteObject(self._selBrush) end
-	if self._chnPen ~= nilptr then DeleteObject(self._chnPen) end
-	if self._ticPen ~= nilptr then DeleteObject(self._ticPen) end
-	print("TrackBar destroyed")
-end
+	--Private function
+	function TrackBar:destroy()
+		DeleteObject(self._bkBrush)
+		if self._selBrush ~= nilptr then DeleteObject(self._selBrush) end
+		if self._chnPen ~= nilptr then DeleteObject(self._chnPen) end
+		if self._ticPen ~= nilptr then DeleteObject(self._ticPen) end
+		print("TrackBar destroyed")
+	end
+
+
+-- End private function
 
 function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 	local this = (@*TrackBar)((pointer)(refData))
@@ -483,7 +512,7 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             	local ea: EventArgs = {}
             	this.onValueChanged(this, &ea)
             end
-       
+
         case THUMB_LINE_HIGH then
             this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
             this.trackChange = TrackChange.ArrowHigh
@@ -499,7 +528,7 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             	local ea: EventArgs = {}
             	this.onValueChanged(this, &ea)
             end
-       
+
         case THUMB_PAGE_HIGH then
             this:setupValueInternal((@integer)(SendMessageW(hw, TBM_GETPOS, 0, 0)))
             this.trackChange = TrackChange.PageHigh
