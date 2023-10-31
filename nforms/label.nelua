@@ -15,6 +15,7 @@ require "nforms.common"
 local lbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
 local lbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local lbNumber = 1
+local lbClass = toUTF16("Static")
 local function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global LabelBorder = @enum {noBorder = 0, singleLine, sunkenBorder}
@@ -65,28 +66,36 @@ global Label = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function Label:createHandle() <forwarddecl> end
+global LabelParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public function
-function Label.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Label
-	local this : Label
+function Label.new(params: LabelParams) : *Label
+	local this : *Label = default_allocator:new(@Label)
 	this.name = string.format("Label_%d", lbNumber)
-	this.className = toUTF16("Static")
-	this.text = txt == "" and this.name or txt
-	this.width = w
-	this.height = h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
+	this.className = lbClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width
+	this.height = params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
 	this._style = lbStyle
 	this._exStyle = lbExStyle
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     this.autoSize = true
     this.border = LabelBorder.noBorder
-	this.cid = frm._cidNumber
+	this.cid = params.parent._cidNumber
     lbNumber = lbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -163,8 +172,8 @@ end
 
 --Private function
 function Label:destroy()
-	print("Label destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

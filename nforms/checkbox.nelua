@@ -15,6 +15,7 @@ require "nforms.common"
 -- local cbStyle <comptime> =  WS_VISIBLE | WS_CHILD | WS_CLIPCHILDREN | WS_CLIPSIBLINGS | SS_NOTIFY
 local cbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local cbNumber = 1
+local cbClass = toUTF16("Button")
 local function cbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global CheckBox = @record {
@@ -58,29 +59,38 @@ global CheckBox = @record {
 	onMouseLeave: EventHandler,
 	onCheckedChanged: EventHandler,
 }
+function CheckBox:createHandle() <forwarddecl> end
+global CheckBoxParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+}
 
 -- Public function
-function CheckBox.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : CheckBox
-	local this : CheckBox
+function CheckBox.new(params: CheckBoxParams) : *CheckBox
+	local this : *CheckBox = default_allocator:new(@CheckBox)
 	this.name = string.format("CheckBox_%d", cbNumber)
-	this.className = toUTF16("Button")
-	this.text = txt == "" and this.name or txt
-	this.width = w
-	this.height = h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = cbClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width
+	this.height = params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX
 	this._exStyle = WS_EX_LTRREADING | WS_EX_LEFT
     this._dwTxtFlag = DT_SINGLELINE | DT_VCENTER
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     this.autoSize = true
     cbNumber = cbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+    this.parent._controls:push({this, ControlType.CheckBox})
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this.onCheckedChanged = params.evtFn
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -142,8 +152,9 @@ end
 
 --Private function
 function CheckBox:destroy()
-	print("CheckBox destroyed")
+	-- print("CheckBox destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function cbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

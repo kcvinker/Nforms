@@ -44,6 +44,7 @@ require "nforms.common"
 --End
 
 local npNumber = 1
+local npClass = toUTF16("msctls_updown32")
 local swp_flag = SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER
 local function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
@@ -116,19 +117,27 @@ global NumberPicker = @record {
 	onKeyPress: KeyEventHandler,
 }
 
+function NumberPicker:createHandle() <forwarddecl> end
+function NumberPicker:setDecimalPlace(value: integer) <forwarddecl> end
+global NumberPickerParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer, btnLeft: boolean, deciPrec: integer, 
+	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+}
+
 -- Public function
-function NumberPicker.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : NumberPicker
-	local this : NumberPicker
+function NumberPicker.new(params: NumberPickerParams) : *NumberPicker
+	local this : *NumberPicker = default_allocator:new(@NumberPicker)
 	this.name = string.format("NumberPicker_%d", npNumber)
-	this.className = toUTF16("msctls_updown32")
+	this.className = npClass
 	-- this.text = txt == "" and this.name or txt
-	this.width = w == 0 and 90 or w
-	this.height = h == 0 and 27 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.width = params.width == 0 and 75 or params.width
+	this.height = params.height == 0 and 27 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_VISIBLE|WS_CHILD | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_AUTOBUDDY | UDS_HOTTRACK
 	this._exStyle = 0
     this._buddyStyle = WS_CHILD | WS_VISIBLE | ES_NUMBER | WS_TABSTOP | WS_BORDER
@@ -141,13 +150,16 @@ function NumberPicker.new(frm : *Form, x: integer, y: integer, w: integer, h: in
     this._botEdgeFlag = BF_BOTTOM
 	this.minRange = 0
 	this.maxRange = 100
-	this.decimalPrecision = 0
-	this.formatString = "%.2f"
+	this.decimalPrecision = params.deciPrec
+	this.formatString = "%d"
 	this.step = 1
+	this.buttonLeft = params.btnLeft
     npNumber = npNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
-	this._buddyCID = frm._cidNumber
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this._buddyCID = params.parent._cidNumber
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this.onValueChanged = params.evtFn
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -205,6 +217,7 @@ end
 -- Public function
 function NumberPicker:createHandle()
 	self:setNPStyle()
+	if self.decimalPrecision > 0 then self:setDecimalPlace(self.decimalPrecision) end
 	createControl(self) -- First create the updown control.
 	if self._isCreated then
 		setSubClass(self.handle, (pointer)(self), npWndProc)
@@ -221,6 +234,16 @@ function NumberPicker:createHandle()
             if oldBuddy ~= nilptr then SendMessageW(oldBuddy, MM_BUDDY_RESIZE, 0, 0) end
 		end
 	end	
+end
+
+function NumberPicker:setDecimalPlace(value: integer)
+	self.decimalPrecision = value
+	if value > 0 then
+		self.formatString = string.format("%%.%df", value)
+	else
+		self.formatString = "%d"
+	end
+	self:displayValue()
 end
 
 --Private function
@@ -275,8 +298,8 @@ end
 
 --Private function
 function NumberPicker:destroy()
-	print("NumberPicker destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

@@ -58,6 +58,14 @@ global UINT_MAX <comptime> = 1 << 32
 
 --End
 
+global ControlType = @enum
+{	Form = 0, Button, Calendar, CheckBox, ComboBox, DateTimePicker, GroupBox,
+	Label, ListBox, ListView, NumberPicker, ProgressBar, RadioButton,
+	TextBox, TrackBar, TreeView
+}
+
+global Control = @record {data: pointer, dtype: ControlType }
+
 global function createControl(ctrl: auto)
 	local ctrlTxt : LPCWSTR = ctrl.text and toUTF16(ctrl.text) or nilptr
 	ctrl.handle = CreateWindowExW(ctrl._exStyle, ctrl.className, ctrlTxt, ctrl._style,
@@ -68,6 +76,31 @@ global function createControl(ctrl: auto)
 		ctrl.font:setFontInternal(ctrl.handle)
 	end
 end
+
+global function getMappedRect(ctl: auto) : RECT
+	local rct: RECT
+	local fhwnd: HWND
+	if ctl._isCreated then
+		GetClientRect(ctl.handle, &rct)
+		fhwnd = ctl.handle
+	else
+		rct = {ctl.xpos, ctl.ypos, (ctl.xpos + ctl.width), (ctl.ypos + ctl.height)}
+		fhwnd = ctl.parent.handle
+	end
+	MapWindowPoints(fhwnd, ctl.parent.handle, (@LPPOINT)(&rct), 2)
+	return rct
+end
+
+
+global function right(ctl: auto) : integer
+	return getMappedRect(ctl).right
+end
+
+global function bottom(ctl: auto) : integer
+	return getMappedRect(ctl).bottom
+end
+
+
 
 global function getXFromLPARAM(lpm: LPARAM) : integer return (@integer)(loWord(lpm)) end
 global function getYFromLPARAM(lpm: LPARAM) : integer return (@integer)(hiWord(lpm)) end
@@ -270,3 +303,5 @@ end
 	end
 
 --End
+
+

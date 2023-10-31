@@ -7,11 +7,11 @@ global function makeCOLORREF(red: uinteger, green: uinteger, blue: uinteger): CO
 end
 
 global Color = @record {
-	red: uinteger, 
-	green: uinteger, 
-	blue: uinteger, 
-	value: uinteger, 
-	ref: COLORREF, 
+	red: uinteger,
+	green: uinteger,
+	blue: uinteger,
+	value: uinteger,
+	ref: COLORREF,
 }
 
 local function clip(value: auto): auto
@@ -28,6 +28,21 @@ function Color.new(clr: uinteger): Color
 	return this
 end
 
+function Color:updateColor(clr: uinteger)
+	self.value = clr
+	self.red = clr >> 16
+	self.green = (clr & 0x00ff00) >> 8
+	self.blue = clr & 0x0000ff
+	self.ref = (@COLORREF)((self.blue << 16) | (self.green << 8) | self.red)
+end
+
+-- function Color:updateColorEx(clr: Color)
+-- 	self.value = clr
+-- 	self.red = clr.red
+-- 	self.green = clr.green
+-- 	self.blue = clr.blue
+-- 	self.ref = clr.ref
+-- end
 function Color.fromRGB(r: uinteger, g: uinteger, b: uinteger): Color
 	local this: Color
 	this.value = (r << 16) | (g << 8) | b

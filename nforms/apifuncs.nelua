@@ -235,7 +235,7 @@ global RDW_UPDATENOW : UINT <comptime> = 256
         mask: cuint,
         fmt: cint,
         cx: cint,
-        pszText: LPCWSTR,
+        pszText: LPWSTR,
         cchTextMax: cint,
         iSubItem: cint,
         iImage: cint,
@@ -252,7 +252,7 @@ global RDW_UPDATENOW : UINT <comptime> = 256
         iSubItem: cint,
         state: cint,
         stateMask: cint,
-        pszText: LPCWSTR,
+        pszText: LPWSTR,
         cchTextMax: cint,
         iImage: cint,
         lParam: LPARAM,
@@ -410,6 +410,7 @@ global function ULongToPtr(ul: culong): pointer <cimport,nodecl> end
 global function Ptr32ToPtr(p: pointer): pointer <cimport,nodecl> end
 global function Handle32ToHandle(h: pointer): pointer <cimport,nodecl> end
 global function PtrToPtr32(p: pointer): pointer <cimport,nodecl, cinclude 'winuser.h'> end
+global function MapWindowPoints(hf: HWND, ht: HWND, lpp: LPPOINT, cp: UINT): cint <cimport,nodecl, cinclude 'winuser.h'> end
 
 
 

@@ -3,127 +3,74 @@
 ## A simple GUI library for Nelua programming language. Based on Windows API
 
 ## Screenshots
-![image](https://user-images.githubusercontent.com/8840907/222894006-93484f7a-3231-40d4-afd5-1c4ca9fef20b.png)
+![image](Screenshot_327.jpg)
 
 
 ## Code for the above screenshot
-```ts
+```lua
 
 require "nforms"
 
-local frm = Form.new("NForms GUI Library")
-f:createHandle()
+local frm = Form.new("NForms GUI Library Window", 800, 550)
+frm:createHandle()
 
-local b = Button.new(&frm, "Normal Btn")
-b:createHandle()
-
-local b2 = Button.new(&frm, "Flat Btn", 170)
+local b1 = Button.new{frm, "Normal Btn", create = true}
+local b2 = Button.new{frm, "Flat Color", xpos = right(b1) + 10, 10, create = true}
 b2:setBackColor(0xfdc500)
-b2:createHandle()
-
-local b3 = Button.new(&frm, "Gradient Btn", 320)
+local b3 = Button.new{frm, "Gradient", xpos = right(b2) + 10, 10, create = true}
 b3:setGradientColor(0xeeef20, 0x70e000)
-b3:createHandle()
 
-local function btnClick(bn: pointer, e: *EventArgs)
-	local bt = (@*Button)(bn) // Normally we don't need this here. Just for displaying the feature.
-	print("btn clicked ", bt.text)
-end
-b.onClick = &btnClick // Connect click event to button
+local cmb = ComboBox.new{frm, xpos = right(b3) + 10, 10, create = true}
+cmb:addItems("Windows", "Linux", "MacOS", "ReactOS")
+cmb.selectedIndex = 1
 
-frm:show()
+local dtp = DateTimePicker.new{frm, xpos = right(cmb) + 10, 10, create = true}
 
-```
+local gb = GroupBox.new{frm, "Compiler Options", height = 180, xpos = 10, bottom(b1) + 10, create = true}
+local cb = CheckBox.new{frm, "Threads On", xpos = 20, gb.ypos + 40, create = true}
+local cb2 = CheckBox.new{frm, "Hints Off", xpos = 20, bottom(cb) + 10, create = true}
 
-## Screenshot
-
-![image](https://user-images.githubusercontent.com/8840907/227059551-662c51a7-ed4a-4b1b-88e9-a1fc87c755e4.png)
-
-
-## Code for this image
-
-```ts
-require "nforms"
-
-local f = Form.new("NForms GUI Library", 800)
-f:createHandle()
-
-local b = Button.new(&f, "Normal Btn")
-b:createHandle()
-
-local b2 = Button.new(&f, "Flat Btn", 170)
-b2:setBackColor(0xfdc500)
-b2:createHandle()
-
-local b3 = Button.new(&f, "Gradient Btn", 320)
-b3:setGradientColor(0xeeef20, 0x70e000)
-b3:createHandle()
-
-local tb = TextBox.new(&f, "Text Box", 20, 65)
-tb:createHandle()
-
-local lb = Label.new(&f, "Static Label", 172, 70)
-lb:createHandle()
-
-local cb = CheckBox.new(&f, "CheckBox", 275, 70)
--- cb:setBackColor(0xffbf69)
--- cb:setForeColor(0xffffff)
-cb:createHandle()
-
-local rb = RadioButton.new(&f, "Radio 1", 20, 110)
-rb:createHandle()
-local rb2 = RadioButton.new(&f, "Radio 2", 20, 140)
+local rb1 = RadioButton.new{frm, "Console App", xpos = 20, ypos = bottom(cb2) + 10, create = true}
+local rb2 = RadioButton.new{frm, "Gui App", xpos = 20, ypos = bottom(rb1) + 10, create = true}
 rb2:setForeColor(0xf94144)
-rb2:createHandle()
 
-local cmb = ComboBox.new(&f, 20, 320)
-cmb:addItem("Sample")
-cmb:createHandle()
+local gb2 = GroupBox.new{frm, "Project Details", width = 200, height = 100, xpos = 10, bottom(gb) + 10, create = true}
+local lb1 = Label.new{frm, "Line Space", xpos = 20, gb2.ypos + 32, create = true}
+local np1 = NumberPicker.new{frm, xpos = right(lb1) + 10, gb2.ypos + 28, create = true}
+local lb2 = Label.new{frm, "Tab Size", xpos = 20, bottom(lb1) + 14, create = true}
+local np2 = NumberPicker.new{frm, xpos = np1.xpos, bottom(np1) + 7, create = true, btnLeft = true}
+np2:setDecimalPlace(2)
 
-local lbx = ListBox.new(&f, 20, 172)
-lbx:addItems("Windows", "MacOS", "Linux")
-lbx:createHandle()
+local lbx = ListBox.new{frm, xpos = right(gb) + 10, bottom(b1) + 10, create = true}
+lbx:addItems("Windows", "MacOS", "Linux", "ReactOS")
+
+local lv = ListView.new{frm, width = 330, height = 175, xpos = right(lbx) + 10, ypos = bottom(b1) + 10, create = true}
+-- lv:addColumnsEx("Windows", "Linux", "MacOS", 100, 120, 100)
+lv:addColumns({"Windows", "Linux", "MacOS"}, {100, 120, 100})
+lv:addRowEx({"Win7", "openSUSE", "Mojave"})
+lv:addRowEx({"Win8", "Debian", "Catalina"})
+lv:addRowEx({"Win10", "Fedora", "Big Sur"})
+lv:addRowEx({"Win11", "Ubuntu", "Monterey"})
+
+local tb = TextBox.new{frm, "Name here", xpos = 10, bottom(gb2) + 10, create = true}
+
+local function onTrackChange(bn: pointer, e: *EventArgs) <forwarddecl> end -- I hate forward declarations.
+local tkb = TrackBar.new{frm, xpos = 10, bottom(tb) + 20, create = true, cdraw = true, evtFn = &onTrackChange}
+local pgb = ProgressBar.new{frm, xpos = 10, bottom(tkb) + 30, create = true, perc = true}
+local cal = Calendar.new{frm, xpos = right(gb2) + 20, bottom(lbx) + 30, create = true}
+
+local tv = TreeView.new{frm, xpos = right(cal) + 10, cal.ypos, create = true}
+tv:addNodeWithChilds("Windows", "Win7", "Win8", "Win10", "Win11")
+tv:addNodeWithChilds("Linux", "openSUSE Leap 15.3", "Debian 11", "Fedora 35", "Ubuntu 22.04 LTS")
+tv:addNodeWithChilds("MacOS", "Mojave (10.14)", "Catalina (10.15)", " Big Sur (11.0)", "Monterey (12.0)")
+
+function onTrackChange(bn: pointer, e: *EventArgs)
+	pgb:setValue(tkb.value)
+end
+
+frm:show() -- All set. Now, we can show our form.
 
 
-local dtp = DateTimePicker.new(&f, 116, 114)
-dtp:createHandle()
-
-local gb = GroupBox.new(&f, "", 182, 170)
-gb:createHandle()
-
-local np = NumberPicker.new(&f, 182, 280)
-np.step = 0.5
-np:createHandle()
-
-local np2 = NumberPicker.new(&f, 182, 320)
-np2:createHandle()
-
-local tk = TrackBar.new(&f, 253, 110)
-tk.customDraw = true
--- tk.selectionRange = true
-tk:createHandle()
-
-local tv = TreeView.new(&f, 325, 160)
-tv:createHandle()
-local tnWIn = tv:addNode("Windows")
-local tnLin = tv:addNode("Linux")
-local tnRe = tv:addNode("ReactOS")
-
-tv:addChildNode("Win7", tnWIn)
-tv:addChildNode("Win8", tnWIn)
-tv:addChildNode("Win10", tnWIn)
-tv:addChildNode("Ubuntu", tnLin)
-tv:addChildNode("Mint", tnLin)
-
-local lv = ListView.new(&f, 485, 20)
-lv:createHandle()
--- lv:addColumn("Names", 80)
--- lv:addColumn("Job", 100)
-lv:addColumns({"Names", "Jobs", "Salaries"}, {80, 100, 80})
-lv:addRows("Paul", "Translator", 45000)
-lv:addRows("Sam", "Accountabt", 15000)
-lv:addRows("Jerome", "Clerk", 9000)
-f:show()
 ```
 
 ## NOTE
@@ -133,3 +80,6 @@ To get the native visual styles, you need the manifest file in your exe file's l
 A sample manifest file is here in this repo. You can use it. But remember one thing.
 Manifest file's name must match your exe file's name. i.e, If your exe file's name is
 `app.exe`, your manifest file must have named `app.exe.manifest`.
+
+# How to use.
+Just download the 'nforms' folder and place it in your project folder. That's it!

@@ -68,6 +68,7 @@ require "nforms.common"
 
 local lvStyle <comptime> = WS_VISIBLE|WS_CHILD|WS_CLIPCHILDREN|WS_CLIPSIBLINGS|LVS_REPORT|WS_BORDER|LVS_ALIGNLEFT|LVS_SINGLESEL
 local lvNumber = 1
+local lvClass = toUTF16("SysListView32")
 local function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
@@ -89,7 +90,7 @@ global ListViewColumn = @record {
 	_isHotItem: boolean,
 	_order: integer,
 	_hdrTxtFlag: DWORD,
-	_lvc: *LVCOLUMNW,
+	-- _lvc: *LVCOLUMNW,
 }
 
 global ListViewItem = @record {
@@ -177,18 +178,25 @@ global ListView = @record {
 	onItemHover: EventHandler,
 }
 
+function ListView:createHandle() <forwarddecl> end
+global ListViewParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	width: integer, height: integer, create: boolean
+}
+
 -- Public Constructor
-function ListView.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ListView
-	local this : ListView
+function ListView.new(params: ListViewParams) : *ListView
+	local this : *ListView = default_allocator:new(@ListView)
 	this.name = string.format("ListView_%d", lvNumber)
-	this.className = toUTF16("SysListView32")
-	this.width = w == 0 and 280 or w
-	this.height = h == 0 and 200 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = lvClass
+	this.width = params.width == 0 and 280 or params.width
+	this.height = params.height == 0 and 200 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = lvStyle
 	this._exStyle = 0
 	this.backColor = colorWhite
@@ -205,7 +213,8 @@ function ListView.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
 	this.headerBackColor = Color.new(0xdce1de) 
 	this.headerForeColor = Color.new(0x000000)    
     lvNumber = lvNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -228,7 +237,7 @@ function ListViewItem.new(txt: string, bgColor: uinteger, fgColor: uinteger, img
 	this.backColor = bgColor == 0 and colorWhite or Color.new(bgColor)
 	this.foreColor = fgColor == 0 and colorBlack or Color.new(fgColor)
 	this.index = -1
-	this.imageIndex = imgIndex
+	this.imageIndex = imgIndex == 0 and -1 or imgIndex
 	return this	
 end
 
@@ -263,7 +272,7 @@ end
 
 	function ListView:setHeaderSubclass()
 		self._hdrHwnd = (@HWND)(SendMessageW(self.handle, LVM_GETHEADER, 0, 0))
-		SetWindowSubclass(self._hdrHwnd, &hdrWndProc, subClassID, (@DWORD_PTR)(self))
+		SetWindowSubclass(self._hdrHwnd, &hdrWndProc, subClassID, (@DWORD_PTR)(&self))
 		subClassID = subClassID + 1
 	end
 
@@ -309,7 +318,7 @@ function ListView:addColumnInternal(lvCol: *ListViewColumn)
         lvc.iImage = lvCol.imageIndex
         if lvCol.imageOnRight then lvc.fmt = lvc.fmt | LVCFMT_BITMAP_ON_RIGHT end
     end
-    lvCol._lvc = &lvc
+    -- lvCol._lvc = &lvc
     if self._isCreated then
         SendMessageW(self.handle, LVM_INSERTCOLUMNW, lvCol.index, (@LPARAM)(&lvc))
     	-- We need self to do the painting in wm notify.
@@ -331,11 +340,31 @@ function ListView:addColumns(colNames: span(string), widths: span(integer))
 	end
 end
 
+function ListView:addColumnsEx(...: varargs)
+	local names : vector(string)
+	local widths : vector(integer)
+	## for i=1,select('#', ...) do
+		## local argnode = select(i, ...)
+    	## local argtype = argnode.attr.type
+    	## if argtype.is_stringy then 
+    		names:push(tostring(#[argnode]#))
+    	## else 
+    		widths:push(tointeger(#[argnode]#))
+    	## end    	
+	## end	
+	if names.size == widths.size then
+		for i, name in ipairs(names) do
+			local col: *ListViewColumn = ListViewColumn.new(name, widths[i])
+			self:addColumnInternal(col)
+		end
+	end
+end
+
 --Private function
 function ListView:addItemInternal(item: *ListViewItem)
 	item.index = self._rowIndex
 	local lvi: LVITEMW
-    lvi.mask = LVIF_TEXT | LVIF_PARAM | LVIF_STATE
+    lvi.mask =  LVIF_TEXT | LVIF_PARAM | LVIF_STATE
     if item.imageIndex ~= -1 then lvi.mask = lvi.mask | LVIF_IMAGE end
     lvi.state = 0
     lvi.stateMask = 0
@@ -344,8 +373,8 @@ function ListView:addItemInternal(item: *ListViewItem)
     lvi.iImage = item.imageIndex
     lvi.pszText = toUTF16(item.text)
     lvi.cchTextMax = #item.text
-    lvi.lParam = (@LPARAM)(item)
-    SendMessageW(self.handle, LVM_INSERTITEMW, 0, (@LPARAM)(&lvi))
+    lvi.lParam = (@LPARAM)((@pointer)(item))
+    local x = SendMessageW(self.handle, LVM_INSERTITEMW, 0, (@LPARAM)(&lvi))
     self.items:push(item)
     self._rowIndex = self._rowIndex + 1
 end
@@ -357,26 +386,35 @@ function ListView:addSubItemInternal(sItem: string, itemIndex: integer, subIndx:
     -- auto x = sItem.toUTF16z;
     lw.pszText = toUTF16(sItem)
     lw.iImage = imgIndex
-    SendMessageW(self.handle, LVM_SETITEMTEXTW, itemIndex, (@LPARAM)(&lw))
+    local y = SendMessageW(self.handle, LVM_SETITEMTEXTW, itemIndex, (@LPARAM)(&lw))
     self.items[itemIndex].subItems:push(sItem)
 end
 
-function ListView:addRows(... : varargs)
+function ListView:addRow(... : varargs)
 	local args : vector(string)
 	## for i=1,select('#', ...) do
 		## local argnode = select(i, ...)
-    	## local argtype = argnode.attr.type
-    	## if not argtype.is_stringy then 
+    -- 	## local argtype = argnode.attr.type
+    -- 	## if argtype.is_string then 
     		args:push(tostring(#[argnode]#))
-    	## else
-    		args:push(#[argnode]#)
-    	## end
+    -- 	## else
+    -- 		args:push(tostring(#[argnode]#))
+    	-- ## end
     	
 	## end
+	
 	local lvitem = ListViewItem.new(args[0])
 	self:addItemInternal(lvitem)	
 	for i = 1,<#args do
 		self:addSubItemInternal(args[i], lvitem.index, i, -1)
+	end
+end
+
+function ListView:addRowEx(items: span(string))
+	local lvitem = ListViewItem.new(items[0])
+	self:addItemInternal(lvitem)	
+	for i = 1,<#items do
+		self:addSubItemInternal(items[i], lvitem.index, i, -1)
 	end
 end
 
@@ -437,7 +475,7 @@ function ListView:destroy()
 	if self._hdrHotBrush ~= nilptr then DeleteObject(self._hdrHotBrush) end
     if self._hdrBkBrush ~= nilptr then DeleteObject(self._hdrBkBrush) end
     if self._hdrPen ~= nilptr then DeleteObject(self._hdrPen) end
-	print("ListView destroyed")
+	self = nilptr
 end
 
 

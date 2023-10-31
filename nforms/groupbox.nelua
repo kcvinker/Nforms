@@ -15,6 +15,7 @@ require "nforms.common"
 local gbStyle <comptime> = WS_CHILD|WS_VISIBLE|BS_GROUPBOX|BS_NOTIFY|BS_TOP|WS_OVERLAPPED|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
 local gbExStyle <comptime> = WS_EX_RIGHTSCROLLBAR| WS_EX_CONTROLPARENT
 local gbNumber = 1
+local gbClass = toUTF16("Button")
 local function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global GroupBox = @record {
@@ -59,26 +60,34 @@ global GroupBox = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function GroupBox:createHandle() <forwarddecl> end
+global GroupBoxParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public function
-function GroupBox.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : GroupBox
-	local this : GroupBox
+function GroupBox.new(params: GroupBoxParams) : *GroupBox
+	local this : *GroupBox = default_allocator:new(@GroupBox)
 	this.name = string.format("GroupBox_%d", gbNumber)
-	this.className = toUTF16("Button")
-	this.text = txt == "" and this.name or txt
-	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 100 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = gbClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width == 0 and 180 or params.width
+	this.height = params.height == 0 and 150 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = gbStyle
 	this._exStyle = gbExStyle
 	this._isTextable = true
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     gbNumber = gbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -154,9 +163,10 @@ end
 
 --Private function
 function GroupBox:destroy()
-	print("GroupBox destroyed")
+	-- print("GroupBox destroyed")
 	DeleteObject(self._bkBrush)
 	DeleteObject(self._pen)
+	self = nilptr
 end
 
 function gbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

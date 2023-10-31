@@ -89,7 +89,7 @@ require 'hashmap'
 	global WS_EX_NOPARENTNOTIFY : DWORD  <comptime> = 0x00000004
 	global WS_EX_TRANSPARENT : DWORD  <comptime> = 0x00000020
 
-	-- Different window styles 
+	-- Different window styles
 	local fixedSingleExStyle: DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
 	local fixedSingleStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
 	local fixed3DExStyle : DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CLIENTEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW|WS_EX_OVERLAPPEDWINDOW
@@ -104,8 +104,15 @@ require 'hashmap'
 	local sizableToolStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_THICKFRAME|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
 --End of Window constants
 
+-- local function getChildControl(ctl: pointer, ctype: ControlType) : auto
+-- 	switch ctype do
+-- 	case ControlType.Button then return (@*Button)(ctl)
+-- 	end
+-- 	return nilptr
+-- end
 -- Just to hold some app level informations.
-local Application = @record {
+local Application = @record
+{
 	started : boolean,
 	mainLoopStarted: boolean,
 	hInstance : HINSTANCE,
@@ -120,8 +127,11 @@ local Application = @record {
 
 global app : Application
 
+
+
 local function windowProc(hw : HWND, msg: cuint, wp: WPARAM, lp: LPARAM): LRESULT <forwarddecl> end
 local function regWindow() <forwarddecl> end
+-- local function getChildControl(ctl: pointer, ctype: ControlType) : auto <forwarddecl> end
 global MenuBar <forwarddecl> = @record{}
 global MenuItem <forwarddecl> = @record{}
 -- global MenuClickHandler: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
@@ -130,7 +140,8 @@ global FormState = @enum {Normal = 0, Maximized, Minimized}
 global FormPosition = @enum {Center = 0, TopLeft, TopMid, TopRight, MidLeft, MidRight, BottomLeft, BottomMid, BottomRight, Manual}
 global FormDrawMode = @enum {Default = 0, FlatColor, Gradient}
 
-global Form = @record {
+global Form = @record
+{
 	name : string,
 	text : string,
 	width : integer,
@@ -149,6 +160,7 @@ global Form = @record {
 	style: FormStyle,
 	menuBar: *MenuBar,
 	comboMap : hashmap(HWND, HWND),
+
 	-- Private properties
 	_count: uinteger, -- To know how many forms are there
 	_isCreated: boolean,
@@ -165,6 +177,8 @@ global Form = @record {
 	_cidNumber: integer,
 	_menuNumber: integer,
 	_menuList: vector(*MenuItem),
+	_controls: vector(Control),
+
 	-- Events
 	onMouseDown: MouseEventHandler,
 	onMouseUp: MouseEventHandler,
@@ -195,7 +209,8 @@ global Form = @record {
 
 global MenuType = @enum{BaseMenu = 0, NormalItem, DropDownItem, Seperator}
 
-MenuItem = @record {
+MenuItem = @record
+{
 	handle: HMENU,
 	parentHandle: HMENU,
   	menuID: UINT,
@@ -211,7 +226,8 @@ MenuItem = @record {
 	menus: vector(*MenuItem)
 }
 
-MenuBar = @record {
+MenuBar = @record
+{
 	formPtr: *Form,
 	handle: HMENU,
 	font: Font,
@@ -219,8 +235,8 @@ MenuBar = @record {
 	menus: vector(*MenuItem)
 }
 
-function Form.new(title: string, width: integer, height: integer ) : Form --Constructor
-	local this : Form
+function Form.new(title: string, width: integer, height: integer ) : *Form --Constructor
+	local this : *Form = default_allocator:new(@Form)
 	this._count = this._count + 1
 	this.name = string.format("Form_%d", this._count)
 	this.text = title
@@ -320,6 +336,17 @@ function Form:setPos()
         self.ypos = app.screenHeight - self.height
     end
 end
+
+-- function Form:createChildHandles()
+-- 	if self._controls.size > 0 then
+-- 		for _, ctl in ipairs(self._controls) do
+-- 			local child = getChildControl(ctl.data, ctl.dtype)
+-- 			if child.handle == nilptr then child:createHandle() end
+-- 		end
+-- 	end
+-- end
+
+
 
 --Public function
 function Form:createHandle()
@@ -564,6 +591,7 @@ end
 	function Form:destroy()
 		DeleteObject(self.font.handle)
 		-- if self._drawMode == FormDrawMode.Gradient then self._gdraw:destroy() end
+		self = nilptr
 	end
 
 	function Form:wmDestroyHandler(): boolean
@@ -608,7 +636,7 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 		switch hiWord(wpm) do
 		case 0 then -- from menu
 			local menu = this:getMenuItem((@UINT)(loWord(wpm)))
-			if menu ~= nilptr then 
+			if menu ~= nilptr then
 				local ea : EventArgs = {}
 				menu.onClick(menu, &ea)
 			end
@@ -648,7 +676,11 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 		end
 	case MM_MENU_EVENT then -- When user sets a click event handler for a menu item.
 		this._menuList:push((@*MenuItem)((@pointer)(lpm)))
+	-- case WM_PARENTNOTIFY then
+	-- 	print("parent notify")
 	end
+
+
 	return DefWindowProcW(hw, msg, wpm, lpm)
 end
 
@@ -668,7 +700,7 @@ function MenuItem.new(pFrm: *Form, txt: string, parent: *MenuItem, mtype: MenuTy
 		case MenuType.DropDownItem then this._flag = this._flag | MF_POPUP
 		case MenuType.NormalItem then this._flag = this._flag | MF_STRING
 		case MenuType.Seperator then this._flag = this._flag | MF_SEPARATOR
-	end    
+	end
     if parent ~= nilptr then
         this._parent = parent
         this.parentHandle = parent.handle
@@ -688,14 +720,14 @@ function MenuBar.new(frm: *Form, items: span(string)): *MenuBar
         mi.parentHandle = this.handle
         this.menus:push(mi)
     end
-        
+
     return this
 end
 
 --Private function
 function MenuItem:changeType()
-	if self.menuType == MenuType.BaseMenu or self.menuType == MenuType.NormalItem then 
-		self.menuType = MenuType.DropDownItem 
+	if self.menuType == MenuType.BaseMenu or self.menuType == MenuType.NormalItem then
+		self.menuType = MenuType.DropDownItem
 	end
 end
 
@@ -739,19 +771,19 @@ function MenuItem:createHandle()
 				self._flag = self._flag ~ MF_POPUP
 				self._flag = self._flag | MF_STRING
 				local ret = AppendMenuW(self.parentHandle, self._flag, self.menuID, toUTF16(self.text))
-			end	
+			end
 		case MenuType.NormalItem then
 			local ret = AppendMenuW(self.parentHandle, self._flag, self.menuID, toUTF16(self.text))
 		case MenuType.Seperator then AppendMenuW(self.parentHandle, self._flag, 0, nilptr)
 	end
-end	
+end
 
 function MenuBar:createHandle()
 	if #self.menus > 0 then
 		for _,menu in ipairs(self.menus) do menu:createHandle() end
 		SetMenu(self.formPtr.handle, self	.handle)
 	end
-end	
+end
 
 function Form:addMenuBar(items: span(string)): *MenuBar
 	local mbar = MenuBar.new(self, items)

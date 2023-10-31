@@ -86,6 +86,7 @@ require "nforms.datetime"
 --End
 
 local dtpNumber = 1
+local dtpClass = toUTF16("SysDateTimePick32")
 local function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global DTPFormat = @enum {longDate = 1, shortDate = 2, timeOnly = 4, custom = 8}
@@ -125,7 +126,7 @@ global DateTimePicker = @record {
 	_isMouseEntered: boolean,
 	_drawFlag: uinteger,
 	_bkBrush: HBRUSH,
-    _dwTxtFlag: DWORD,
+    -- _dwTxtFlag: DWORD,
     _dropDownCount: integer,
     _calStyle: DWORD,
 	--Events
@@ -148,30 +149,37 @@ global DateTimePicker = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function DateTimePicker:createHandle() <forwarddecl> end
+global DateTimePickerParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer, create: boolean
+}
+
 -- Public function
-function DateTimePicker.new(frm : *Form, x: integer, y: integer) : DateTimePicker
-	local this : DateTimePicker
+function DateTimePicker.new(params: DateTimePickerParams) : *DateTimePicker
+	local this : *DateTimePicker = default_allocator:new(@DateTimePicker)
 	this.name = string.format("DateTimePicker_%d", dtpNumber)
-	this.className = toUTF16("SysDateTimePick32")
+	this.className = dtpClass
 	this.width = 10
 	this.height = 10
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
 	this._style = WS_CHILD | WS_VISIBLE | WS_TABSTOP
 	this._exStyle = 0
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
-	this.cid = frm._cidNumber
+	this.cid = params.parent._cidNumber
     dtpNumber = dtpNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
 	if not app.isDateInit then
 		app.isDateInit = true
 		app.iccEx.dwICC = ICC_DATE_CLASSES
 		InitCommonControlsEx(&app.iccEx)
 	end
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -229,8 +237,9 @@ end
 
 --Private function
 function DateTimePicker:destroy()
-	print("DateTimePicker destroyed")
+	-- print("DateTimePicker destroyed")
 	-- DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

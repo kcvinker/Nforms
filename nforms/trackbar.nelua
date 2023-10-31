@@ -84,6 +84,7 @@ require "nforms.common"
 --End
 
 local tkNumber = 1
+local tkbClass = toUTF16("msctls_trackbar32")
 local function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global ChannelStyle = @enum {Classic = 0, Outline }
@@ -171,23 +172,30 @@ global TrackBar = @record {
 	onDragged: EventHandler,
 }
 
+-- function TrackBar:createHandle() <forwarddecl> end
+global TrackBarParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer, cdraw: boolean,
+	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+}
+
 function TrackBar:createHandle() <forwarddecl> end
 
 -- Public Constructor
-function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer, bCreate: boolean) : TrackBar
-	local this : TrackBar
+function TrackBar.new(params: TrackBarParams) : *TrackBar
+	local this : *TrackBar = default_allocator:new(@TrackBar)
 	this.name = string.format("TrackBar_%d", tkNumber)
-	this.className = toUTF16("msctls_trackbar32")
-	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 38 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = tkbClass
+	this.width = params.width == 0 and 180 or params.width
+	this.height = params.height == 0 and 38 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE | TBS_AUTOTICKS
 	this._exStyle = WS_EX_RIGHTSCROLLBAR | WS_EX_LTRREADING |WS_EX_LEFT
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     this._chnFlag = BF_RECT | BF_ADJUST
     this.ticWidth = 1
@@ -203,9 +211,11 @@ function TrackBar.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
     this.ticColor = Color.new(0x3385ff)
 	this.channelColor = Color.new(0xc2c2a3)
 	this.selectionColor = Color.new(0x99ff33)
+	this.customDraw = params.cdraw
     tkNumber = tkNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
-	if bCreate then this:createHandle() end
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this.onValueChanged = params.evtFn
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -327,25 +337,21 @@ end
 		end
 	end
 
-	function TrackBar:setBackColor(clr: uinteger)
-		-- local isOkay = false
-		-- local tname = #[clr.type.name]#
-		-- local tnick = #[clr.type.nickname]#
-		-- if tname == 'int64' then
-		-- 	self.backColor:updateColor(clr)
-		-- 	isOkay = true
-		-- elseif 'record' then
-		-- 	if tnick == 'Color' then
-		-- 		self.backColor = clr
-		-- 		isOkay = true
-		-- 	end
-		-- end
-		-- if isOkay then
-		self.backColor:updateColor(clr)
-		self._bkBrush = CreateSolidBrush(self.backColor.ref)
-		if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
-		SendMessageW(self.handle, TBM_SETRANGEMAX, 1, (@LPARAM)(self.maxRange))
-		InvalidateRect(self.handle, nilptr, 0)
+	function TrackBar:setBackColor(clr: auto)
+		local isOkay = false
+		## if symbols.clr.type == symbols.int64.value then
+			self.backColor:updateColor(clr)
+			isOkay = true
+		## elseif symbols.clr.type == symbols.Color.value then
+			self.backColor = clr
+			isOkay = true
+		## end
+		if isOkay then
+			self._bkBrush = CreateSolidBrush(self.backColor.ref)
+			if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
+			SendMessageW(self.handle, TBM_SETRANGEMAX, 1, (@LPARAM)(self.maxRange))
+			InvalidateRect(self.handle, nilptr, 0)
+		end
 	end
 
 -- End public function
@@ -455,7 +461,7 @@ end
 		if self._selBrush ~= nilptr then DeleteObject(self._selBrush) end
 		if self._chnPen ~= nilptr then DeleteObject(self._chnPen) end
 		if self._ticPen ~= nilptr then DeleteObject(self._ticPen) end
-		print("TrackBar destroyed")
+		self = nilptr
 	end
 
 

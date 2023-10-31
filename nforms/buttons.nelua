@@ -28,11 +28,12 @@ local mouse_clicked: DWORD_PTR = 0b1
 local mouse_over: DWORD_PTR = 0b1000000
 local btn_round_factor: cint = 5
 local btnNumber = 1
+local btnClass = toUTF16("Button")
 -- local btnClassName : []WCHAR = {66, 85, 84, 84, 79, 78, 0} --BUTTON -- I dropped this idea.
 
 local function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN} -- Flat color 
+local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN} -- Flat color
 local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN} -- GradColor is declared in commons
 
 
@@ -74,25 +75,34 @@ global Button = @record
 	onMouseMove: MouseEventHandler,
 	onMouseLeave: EventHandler,
 }
+function Button:createHandle() <forwarddecl> end
+global ButtonParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+}
 
 -- Public function
-function Button.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : Button
-	local this : Button
+function Button.new(params: ButtonParams) : *Button
+	local this : *Button = default_allocator:new(@Button)
 	this.name = string.format("Button_%d", btnNumber)
-	this.className = toUTF16("Button")
-	this.text = txt == "" and this.name or txt
-	this.width = w == 0 and 120 or w
-	this.height = h == 0 and 35 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
+	this.className = btnClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width == 0 and 120 or params.width
+	this.height = params.height == 0 and 35 or params.height
+	this.xpos = params.xpos == 0 and 10 or params.xpos
+	this.ypos = params.ypos == 0 and 10 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
 	this._style = WS_CHILD | WS_TABSTOP | WS_VISIBLE | BS_NOTIFY
 	this._exStyle = 0
 	this._isTextable = true
-	this.cid = frm._cidNumber
+	this.cid = params.parent._cidNumber
 	btnNumber = btnNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	if params.evtFn ~= nilptr then this.onClick = params.evtFn end
+	this.parent._controls:push({this, ControlType.Button})
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end	
 	return this
 end
 
@@ -125,14 +135,14 @@ function FlatDraw:destroy()
 	if self.hotBrush ~= nilptr then DeleteObject(self.hotBrush) end
 	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
 	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
-	print("flat draw resources destroyed")
+	-- print("flat draw resources destroyed")
 end
 
 --Private function
 function GradDraw:destroy()
 	if self.defPen ~= nilptr then DeleteObject(self.defPen) end
 	if self.hotPen ~= nilptr then DeleteObject(self.hotPen) end
-	print("Grad draw resources destroyed")
+	-- print("Grad draw resources destroyed")
 end
 
 
@@ -152,9 +162,10 @@ end
 --Private function
 function Button:destroy()
 	switch self._drawFlag do
-	case 2, 3 then self._fdraw:destroy()
-	case 4, 5 then self._gdraw:destroy()
+		case 2, 3 then self._fdraw:destroy()
+		case 4, 5 then self._gdraw:destroy()
 	end
+	self = nilptr
 end
 
 -- Public function
@@ -268,7 +279,7 @@ function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)
 	case WM_RBUTTONDOWN then rightMouseDownHandler(this, msg, wpm, lpm)
 	case WM_RBUTTONUP then rightMouseUpHandler(this, msg, wpm, lpm)
-	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
+	-- case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)

@@ -14,6 +14,7 @@ require "nforms.common"
 --End
 
 local rbNumber = 1
+local rbClass = toUTF16("Button")
 local function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global RadioButton = @record {
@@ -61,28 +62,37 @@ global RadioButton = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function RadioButton:createHandle() <forwarddecl> end
+global RadioButtonParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+}
+
 -- Public function
-function RadioButton.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : RadioButton
-	local this : RadioButton
+function RadioButton.new(params: RadioButtonParams) : *RadioButton
+	local this : *RadioButton = default_allocator:new(@RadioButton)
 	this.name = string.format("RadioButton_%d", rbNumber)
-	this.className = toUTF16("Button")
-	this.text = txt == "" and this.name or txt
-	this.width = w
-	this.height = h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = rbClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width
+	this.height = params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON
 	this._exStyle = WS_EX_LTRREADING | WS_EX_LEFT
     this._dwTxtFlag = DT_SINGLELINE | DT_VCENTER
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     this.autoSize = true
     rbNumber = rbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this.onCheckedChanged = params.evtFn
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -146,8 +156,8 @@ end
 
 --Private function
 function RadioButton:destroy()
-	print("RadioButton destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function rbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

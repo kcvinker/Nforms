@@ -40,6 +40,7 @@ require "nforms.common"
 --End
 
 local lbxNumber = 1
+local lbxClass = toUTF16("ListBox")
 local function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global ListBox = @record {
@@ -97,24 +98,32 @@ global ListBox = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function ListBox:createHandle() <forwarddecl> end
+global ListBoxParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public function
-function ListBox.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ListBox
-	local this : ListBox
+function ListBox.new(params: ListBoxParams) : *ListBox
+	local this : *ListBox = default_allocator:new(@ListBox)
 	this.name = string.format("ListBox_%d", lbxNumber)
-	this.className = toUTF16("ListBox")
-	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 150 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = lbxClass
+	this.width = params.width == 0 and 150 or params.width
+	this.height = params.height == 0 and 180 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_VISIBLE | WS_CHILD | WS_BORDER  | LBS_NOTIFY | LBS_HASSTRINGS
 	this._exStyle = 0
 	this.backColor = colorWhite
 	this.foreColor = colorBlack
     lbxNumber = lbxNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -324,8 +333,8 @@ end
 
 --Private function
 function ListBox:destroy()
-	print("ListBox destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function lbxWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

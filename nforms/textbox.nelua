@@ -26,6 +26,7 @@ require "nforms.common"
 local tbStyle <comptime> =  WS_CHILD|WS_VISIBLE|ES_LEFT|WS_TABSTOP|ES_AUTOHSCROLL|WS_MAXIMIZEBOX|WS_OVERLAPPED
 local tbExStyle <comptime> = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local tbNumber = 1
+local tbClass = toUTF16("Edit")
 
 local function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
@@ -80,26 +81,34 @@ global TextBox = @record {
 	onKeyPress: KeyEventHandler,
 }
 
+function TextBox:createHandle() <forwarddecl> end
+global TextBoxParams = @record
+{
+	parent: *Form, text: string, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public function
-function TextBox.new(frm : *Form, txt: string, x: integer, y: integer, w: integer, h: integer) : TextBox
-	local this : TextBox
+function TextBox.new(params: TextBoxParams) : *TextBox
+	local this : *TextBox = default_allocator:new(@TextBox)
 	this.name = string.format("TextBox_%d", tbNumber)
-	this.className = toUTF16("Edit")
-	this.text = txt == "" and this.name or txt
-	this.width = w == 0 and 140 or w
-	this.height = h == 0 and 27 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = tbClass
+	this.text = params.text == "" and this.name or params.text
+	this.width = params.width == 0 and 140 or params.width
+	this.height = params.height == 0 and 27 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = tbStyle
 	this._exStyle = tbExStyle
 	this._isTextable = true
 	this.backColor = colorWhite
 	this.foreColor = colorBlack
 	tbNumber = tbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -167,8 +176,8 @@ end
 
 --Private function
 function TextBox:destroy()
-	print("TextBox destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function tbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

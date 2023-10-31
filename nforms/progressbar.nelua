@@ -25,6 +25,7 @@ require "nforms.common"
 local pbStyle <comptime> =  WS_VISIBLE | WS_CHILD 
 local lbExStyle <comptime> = 0 --WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_CLIENTEDGE|WS_EX_NOPARENTNOTIFY
 local pbNumber = 1
+local pbClass = toUTF16("msctls_progress32")
 local function pbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 
@@ -83,21 +84,28 @@ global ProgressBar = @record {
 	-- onKeyPress: KeyEventHandler,
 }
 
+function ProgressBar:createHandle() <forwarddecl> end
+global ProgressBarParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean, perc: boolean
+}
+
 -- Public function
-function ProgressBar.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ProgressBar
-	local this : ProgressBar
+function ProgressBar.new(params: ProgressBarParams) : *ProgressBar
+	local this : *ProgressBar = default_allocator:new(@ProgressBar)
 	this.name = string.format("ProgressBar_%d", pbNumber)
-	this.className = toUTF16("msctls_progress32")
-	this.width = w == 0 and 230 or w
-	this.height = h == 0 and 25 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
+	this.className = pbClass
+	this.width = params.width == 0 and 230 or params.width
+	this.height = params.height == 0 and 25 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
 	this._style = pbStyle
 	this._exStyle = 0
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
     this.minValue = 0
     this.maxValue = 100
@@ -105,9 +113,11 @@ function ProgressBar.new(frm : *Form, x: integer, y: integer, w: integer, h: int
     this.barState = ProgressBarState.normal
     this.barStyle = ProgressBarStyle.block
     this.marqueeSpeed = 30
-	this.cid = frm._cidNumber
+	this.cid = params.parent._cidNumber
     pbNumber = pbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+    this.showPercentage = params.perc
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -195,8 +205,8 @@ end
 
 --Private function
 function ProgressBar:destroy()
-	print("ProgressBar destroyed")
 	DeleteObject(self._bkBrush)
+	self = nilptr
 end
 
 function pbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
@@ -216,7 +226,7 @@ function pbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
 	case WM_PAINT then
-        if this.showPercentage and this.barStyle == ProgressBarStyle.marquee then
+        if this.showPercentage and this.barStyle == ProgressBarStyle.block then
             DefSubclassProc(hw, msg, wpm, lpm)
             local ss: SIZE
             local vtext = string.format("%d%%", this.value)

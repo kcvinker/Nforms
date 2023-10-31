@@ -42,7 +42,9 @@ require "nforms.datetime"
 
 
 local calNumber = 1
+local calClass = toUTF16("SysMonthCal32")
 local function calWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+
 
 global ViewMode = @enum {month = 0, year, decade, centuary}
 
@@ -95,30 +97,38 @@ global Calendar = @record {
 	onViewChanged: EventHandler,
 }
 
+function Calendar:createHandle() <forwarddecl> end
+global CalendarParams = @record 
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	create: boolean
+}
+
 -- Public function
-function Calendar.new(frm : *Form, x: integer, y: integer) : Calendar
-	local this : Calendar
+function Calendar.new(params: CalendarParams) : *Calendar
+	local this : *Calendar = default_allocator:new(@Calendar)
 	this.name = string.format("Calendar_%d", calNumber)
-	this.className = toUTF16("SysMonthCal32")
+	this.className = calClass
 	this.width = 100
 	this.height = 100
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
 	this._style = WS_CHILD | WS_VISIBLE
 	this._exStyle = 0
 	this._isTextable = false
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
-	this.cid = frm._cidNumber
+	this.cid = params.parent._cidNumber
     calNumber = calNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
 	if not app.isDateInit then
 		app.isDateInit = true
 		app.iccEx.dwICC = ICC_DATE_CLASSES
 		InitCommonControlsEx(&app.iccEx)
 	end
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -156,7 +166,7 @@ end
 
 --Private function
 function Calendar:destroy()
-	print("Calendar destroyed")
+	-- print("Calendar destroyed")
 	-- DeleteObject(self._bkBrush)
 end
 

@@ -72,6 +72,7 @@ require "nforms.common"
 
 local tvStyle <comptime> = WS_BORDER|WS_CHILD|WS_VISIBLE|TVS_HASLINES|TVS_HASBUTTONS|TVS_LINESATROOT|TVS_DISABLEDRAGDROP
 local tvNumber = 1
+local tvClass = toUTF16("SysTreeView32")
 local function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
 global NodeOps = @enum {AddNode = 0, InsertNode, AddChild, InsertChild }
@@ -144,18 +145,25 @@ global TreeView = @record {
 	onMouseLeave: EventHandler,	
 }
 
+function TreeView:createHandle() <forwarddecl> end
+global TreeViewParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public Constructor
-function TreeView.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : TreeView
-	local this : TreeView
+function TreeView.new(params: TreeViewParams) : *TreeView
+	local this : *TreeView = default_allocator:new(@TreeView)
 	this.name = string.format("TreeView_%d", tvNumber)
-	this.className = toUTF16("SysTreeView32")
-	this.width = w == 0 and 150 or w
-	this.height = h == 0 and 100 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = tvClass
+	this.width = params.width == 0 and 220 or params.width
+	this.height = params.height == 0 and 200 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = tvStyle
 	this._exStyle = 0
 	this.backColor = colorWhite
@@ -163,7 +171,8 @@ function TreeView.new(frm : *Form, x: integer, y: integer, w: integer, h: intege
     this.lineColor = colorBlack    
     this._uniqNodeID = 100
     tvNumber = tvNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -330,10 +339,31 @@ function TreeView:insertChildNodeEx(node: *TreeNode, parentNode: *TreeNode, inde
 	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
 end
 
+function TreeView:addNodeWithChilds(...: varargs)
+	local items : vector(string)
+	## for i=1,select('#', ...) do
+		## local argnode = select(i, ...)
+    	## local argtype = argnode.attr.type
+    	## if argtype.is_string then 
+    		items:push(#[argnode]#)
+    	## else 
+    		items:push(tostring(#[argnode]#))
+    	## end    	
+	## end
+	if items.size > 0 then
+		local pnode: *TreeNode = TreeNode.new(items[0])
+		self:addNodeInernal(NodeOps.AddNode, pnode, nilptr, -1)
+		for i = 1, (items.size - 1) do
+			local node: *TreeNode = TreeNode.new(items[i])
+			self:addNodeInernal(NodeOps.AddChild, node, pnode, -1)
+		end
+	end
+end
+
 --Private function
 function TreeView:destroy()
 	DeleteObject(self._bkBrush)	
-	print("TreeView destroyed")
+	self = nilptr
 end
 
 function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT

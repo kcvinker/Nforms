@@ -29,10 +29,12 @@ require "nforms.common"
 --End
 
 local cmbNumber = 1
+local cmbClass = toUTF16("ComboBox")
 local function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global ComboBox = @record {
+global ComboBox = @record
+{
 	name : string,
 	text : string,
 	className: LPCWSTR,
@@ -88,25 +90,34 @@ global ComboBox = @record {
 	onKeyPress: KeyEventHandler,
 }
 
+function ComboBox:createHandle() <forwarddecl> end
+global ComboBoxParams = @record
+{
+	parent: *Form, xpos: integer, ypos: integer,
+	width: integer, height: integer,  create: boolean
+}
+
 -- Public function
-function ComboBox.new(frm : *Form, x: integer, y: integer, w: integer, h: integer) : ComboBox
-	local this : ComboBox
+function ComboBox.new(params: ComboBoxParams) : *ComboBox
+	local this : *ComboBox = default_allocator:new(@ComboBox)
 	this.name = string.format("ComboBox_%d", cmbNumber)
-	this.className = toUTF16("ComboBox")
-	this.width = w == 0 and 140 or 1
-	this.height = h == 0 and 30 or h
-	this.xpos = x == 0 and 20 or x
-	this.ypos = y == 0 and 20 or y
-	this.font = frm.font
-	this.parent = frm
-	this.cid = frm._cidNumber
+	this.className = cmbClass
+	this.width = params.width == 0 and 140 or params.width
+	this.height = params.height == 0 and 30 or params.height
+	this.xpos = params.xpos == 0 and 20 or params.xpos
+	this.ypos = params.ypos == 0 and 20 or params.ypos
+	this.font = params.parent.font
+	this.parent = params.parent
+	this.cid = params.parent._cidNumber
 	this._style = WS_CHILD | WS_VISIBLE
 	this._exStyle = 0 -- WS_EX_CLIENTEDGE
-	this.backColor = frm.backColor
+	this.backColor = params.parent.backColor
 	this.foreColor = colorBlack
 	this.selectedIndex = -1
-    cmbNumber = cmbNumber + 1
-	frm._cidNumber = frm._cidNumber + 1
+  	cmbNumber = cmbNumber + 1
+	params.parent._cidNumber = params.parent._cidNumber + 1
+	this.parent._controls:push({this, ControlType.ComboBox})
+	if params.create then this:createHandle() end
 	return this
 end
 
@@ -146,7 +157,7 @@ function ComboBox:createHandle()
 		if self.selectedIndex > -1 then
 			SendMessageW(self.handle, CB_SETCURSEL, (@WPARAM)(self.selectedIndex), 0)
 		end
-        self._recreateEnabled = false
+       	self._recreateEnabled = false
 	end
 end
 
@@ -300,8 +311,10 @@ end
 
 --Private function
 function ComboBox:destroy()
-	print("ComboBox destroyed")
-	DeleteObject(self._bkBrush)
+	if not self._recreateEnabled then
+		DeleteObject(self._bkBrush)
+		self = nilptr
+	end
 end
 
 function cmbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
@@ -389,7 +402,7 @@ function cmbEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UIN
 	local this = (@*ComboBox)((pointer)(refData))
 	switch msg do
 	case WM_DESTROY then
-		print("Combo's Edit destroyed")
+		-- print("Combo's Edit destroyed")
 	    RemoveWindowSubclass(hw, cmbEditWndProc, scID)
 
 	case WM_KEYDOWN then keyDownHandler(this, wpm)
