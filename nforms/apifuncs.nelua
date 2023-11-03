@@ -468,7 +468,7 @@ global function GetDC(hWnd: HWND): HDC <cimport,nodecl> end
 global function ReleaseDC(hWnd: HWND, hDC: HDC): cint <cimport,nodecl> end
 global function MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: cuint): cint <cimport,nodecl> end
 global function LoadIconW(hInstance: HINSTANCE, lpIconName: LPCWSTR): HICON <cimport,nodecl> end
-global function LoadIconA(hInstance: HINSTANCE, lpIconName: *cstring): HICON <cimport,nodecl> end
+global function LoadImageW(hInst: HINSTANCE, lpIconName: LPCWSTR, typ: UINT, cx: cint, cy: cint, ful: UINT): HANDLE <cimport,nodecl> end
 
 global function LoadCursorW(hInstance: HINSTANCE, lpCursorName: LPCWSTR): HCURSOR <cimport,nodecl> end
 global function LoadCursorA(hInstance: HINSTANCE, lpCursorName: *cstring): HCURSOR <cimport,nodecl> end

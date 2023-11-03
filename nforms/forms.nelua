@@ -258,6 +258,7 @@ end
 function regWindow()
 	app.className = "NForms_Window_Nelua"
 	app.hInstance = GetModuleHandleW(nilptr)
+	local icon = toUTF16(".\\nforms\\feather.ico")
 	local wcEx : WNDCLASSEXW
 	local clr : COLORREF = (@COLORREF)(0x00EBEFF0)
 	wcEx.cbSize = #WNDCLASSEXW
@@ -266,7 +267,7 @@ function regWindow()
 	wcEx.cbClsExtra = 0
 	wcEx.cbWndExtra = 256
 	wcEx.hInstance = app.hInstance
-	wcEx.hIcon = LoadIconW(nilptr, IDI_APPLICATION)
+	wcEx.hIcon = LoadImageW(nilptr, icon, 1, 0, 0, 16|64)
 	wcEx.hCursor = LoadCursorW(nilptr, IDC_ARROW)
 	wcEx.hbrBackground = (@HBRUSH)(CreateSolidBrush(clr))  --(@HBRUSH)(6)
 	wcEx.lpszMenuName = nilptr

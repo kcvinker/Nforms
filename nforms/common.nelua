@@ -92,12 +92,12 @@ global function getMappedRect(ctl: auto) : RECT
 end
 
 
-global function right(ctl: auto) : integer
-	return getMappedRect(ctl).right
+global function right(ctl: auto, value: number) : integer
+	return getMappedRect(ctl).right + value
 end
 
-global function bottom(ctl: auto) : integer
-	return getMappedRect(ctl).bottom
+global function bottom(ctl: auto, value: number) : integer
+	return getMappedRect(ctl).bottom + value
 end
 
 
