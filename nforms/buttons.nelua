@@ -16,8 +16,9 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+-- require "nforms.forms"
 require "nforms.common"
+require 'nforms.controls'
 
 local BS_NOTIFY <comptime> = 0x00004000
 local BS_DEFPUSHBUTTON <comptime> = 0x00000001
@@ -33,48 +34,7 @@ local btnClass = toUTF16("Button")
 
 local function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-local FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN} -- Flat color
-local GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN} -- GradColor is declared in commons
 
-
-global Button = @record
-{
-	name : string,
-	className: LPCWSTR,
-	text : string,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-	--Privates
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_fdraw: FlatDraw,
-	_gdraw: GradDraw,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-}
 function Button:createHandle() <forwarddecl> end
 global ButtonParams = @record
 {
@@ -102,7 +62,9 @@ function Button.new(params: ButtonParams) : *Button
 	if params.evtFn ~= nilptr then this.onClick = params.evtFn end
 	this.parent._controls:push({this, ControlType.Button})
 	params.parent._cidNumber = params.parent._cidNumber + 1
-	if params.create then this:createHandle() end	
+	-- testControl(this)
+	if params.create then this:createHandle() end
+
 	return this
 end
 
@@ -113,6 +75,8 @@ function FlatDraw:init(clr: Color)
 	self.defPen = CreatePen(PS_SOLID, 1, clr:getHotColor(0.6).ref)
 	self.hotPen = CreatePen(PS_SOLID, 1, clr:getHotColor(0.3).ref)
 end
+
+
 
 --Private function
 function GradDraw:init(c1: uinteger, c2: uinteger)
@@ -148,10 +112,16 @@ end
 
 -- Public function
 function Button:createHandle()
+		
 	createControl(self)
 	if self._isCreated then
 		setSubClass(self.handle, (pointer)(self), btnWndProc)
 	end
+end
+
+function Button:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
 end
 
 function Button:setText(txt: string)
@@ -274,6 +244,9 @@ function btnWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	    RemoveWindowSubclass(hw, btnWndProc, scID)
 		this:destroy()
 
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
+		
 	case WM_LBUTTONDOWN then leftMouseDownHandler(this, msg, wpm, lpm)
 	case WM_LBUTTONUP then leftMouseUpHandler(this, msg, wpm, lpm)
 	case MM_MOUSE_LB_CLICK then leftMouseClickHandler(this)

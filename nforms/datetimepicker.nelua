@@ -3,7 +3,7 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
 require "nforms.datetime"
 
@@ -89,65 +89,7 @@ local dtpNumber = 1
 local dtpClass = toUTF16("SysDateTimePick32")
 local function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global DTPFormat = @enum {longDate = 1, shortDate = 2, timeOnly = 4, custom = 8}
 
-global DateTimePicker = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-    format: DTPFormat,
-    formatString: string,
-    rightAlign: boolean,
-    fourDigitYear: boolean,
-    value : DateTime,
-    showWeekNum : boolean,
-    noTodayCircle : boolean,
-    noToday : boolean,
-    noTrailingDates : boolean,
-    shortDayNames : boolean,
-    showUpdown : boolean,
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-    -- _dwTxtFlag: DWORD,
-    _dropDownCount: integer,
-    _calStyle: DWORD,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	onValueChanged: EventHandler,
-	onCalendarOpened: EventHandler,
-	onCalendarClosed: EventHandler,
-    onTextChanged: DateTimeEventHandler,
-	-- onKeyDown: KeyEventHandler,
-	-- onKeyUp: KeyEventHandler,
-	-- onKeyPress: KeyEventHandler,
-}
 
 function DateTimePicker:createHandle() <forwarddecl> end
 global DateTimePickerParams = @record
@@ -181,6 +123,11 @@ function DateTimePicker.new(params: DateTimePickerParams) : *DateTimePicker
 	end
 	if params.create then this:createHandle() end
 	return this
+end
+
+function DateTimePicker:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
 end
 
 --Private function
@@ -261,6 +208,9 @@ function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
 	-- case WM_KEYDOWN then keyDownHandler(this, wpm)
 	-- case WM_KEYUP then keyUpHandler(this, wpm)
 	-- case WM_CHAR then keyPressHandler(this, wpm)
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
+		
 	case MM_NOTIFY_REFLECT then
 		local nm = (@LPNMHDR)(lpm)
 		switch nm.code do

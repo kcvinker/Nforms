@@ -3,7 +3,7 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
 
 --Constants
@@ -18,53 +18,7 @@ local lbNumber = 1
 local lbClass = toUTF16("Static")
 local function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global LabelBorder = @enum {noBorder = 0, singleLine, sunkenBorder}
 
-global Label = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-	alignment: TextAlign,
-	multiLine: boolean,
-	autoSize: boolean,
-	rightAlign: boolean,
-    border: LabelBorder,
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-    _dwTxtFlag: DWORD,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	-- onKeyDown: KeyEventHandler,
-	-- onKeyUp: KeyEventHandler,
-	-- onKeyPress: KeyEventHandler,
-}
 
 function Label:createHandle() <forwarddecl> end
 global LabelParams = @record
@@ -97,6 +51,11 @@ function Label.new(params: LabelParams) : *Label
 	params.parent._cidNumber = params.parent._cidNumber + 1
 	if params.create then this:createHandle() end
 	return this
+end
+
+function Label:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
 end
 
 --Private function
@@ -192,6 +151,9 @@ function lbWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
+		
 	case MM_LABEL_COLOR then
         local hdc = (HDC)(wpm)
 		if (this._drawFlag & 1) == 1 then SetTextColor(hdc, this.foreColor.ref) end

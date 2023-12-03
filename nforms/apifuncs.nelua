@@ -10,6 +10,10 @@ cinclude "<commctrl.h>"
 
 ## linklib "Gdi32"
 ## linklib "Comctl32"
+## linklib "comdlg32"
+## linklib "ole32"
+## linklib "shell32"
+
 -- Windows Data Types
     global HANDLE: type = @pointer
     global PHANDLE: type = @*HANDLE
@@ -247,19 +251,19 @@ global RDW_UPDATENOW : UINT <comptime> = 256
     global LPLVCOLUMNW = @*LVCOLUMNW
 
     global LVITEMW : type <cimport,nodecl> = @record {
-        mask: cuint,
+        mask: UINT,
         iItem: cint,
         iSubItem: cint,
-        state: cint,
-        stateMask: cint,
+        state: UINT,
+        stateMask: UINT,
         pszText: LPWSTR,
         cchTextMax: cint,
         iImage: cint,
         lParam: LPARAM,
         iIndent: cint,
         iGroupId: cint,
-        cColumns: cuint,
-        puColumns: *cuint,
+        cColumns: UINT,
+        puColumns: *UINT,
         piColFmt: *cint,
         iGroup: cint,
     }
@@ -275,10 +279,10 @@ global RDW_UPDATENOW : UINT <comptime> = 256
     global WINDOWPOS : type <cimport,nodecl> = @record {
         hwnd : HWND,
         hwndInsertAfter : HWND,
-        x : cint,
-        y : cint,
-        cx : cint,
-        cy : cint,
+        x : int32,
+        y : int32,
+        cx : int32,
+        cy : int32,
         flags : UINT
     }
     global LPWINDOWPOS = @*WINDOWPOS
@@ -329,6 +333,105 @@ global RDW_UPDATENOW : UINT <comptime> = 256
         uKeyFlags: UINT,
     }
     global LPNMITEMACTIVATE = @*NMITEMACTIVATE
+
+    global OFNHOOKPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): UINT_PTR
+    global BROWSECBPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): cint    
+
+    global OPENFILENAMEW : type <cimport,nodecl> = @record {
+        lStructSize: DWORD,
+        hwndOwner: HWND,
+        hInstance: HINSTANCE,
+        lpstrFilter: LPCWSTR,
+        lpstrCustomFilter: LPWSTR,
+        nMaxCustFilter: DWORD,
+        nFilterIndex: DWORD,
+        lpstrFile: LPWSTR,
+        nMaxFile: DWORD,
+        lpstrFileTitle: LPWSTR,
+        nMaxFileTitle: DWORD,
+        lpstrInitialDir: LPCWSTR,
+        lpstrTitle: LPCWSTR,
+        Flags: DWORD,
+        nFileOffset: WORD,
+        nFileExtension: WORD,
+        lpstrDefExt: LPCWSTR,
+        lCustData: LPARAM,
+        lpfnHook: OFNHOOKPROC,
+        lpTemplateName: LPCWSTR,
+        pvReserved: pointer,
+        dwReserved: DWORD,
+        FlagsEx: DWORD,
+    }
+    global LPOPENFILENAMEW = @*OPENFILENAMEW
+
+    global SHITEMID : type <cimport,nodecl> = @record {
+        cb: uint16,
+        abID: [1]uint8
+    }
+    global LPSHITEMID = @*SHITEMID
+
+    global ITEMIDLIST : type <cimport,nodecl> = @record { mkid: SHITEMID }
+
+    global ITEMIDLIST_RELATIVE = ITEMIDLIST
+    global ITEMID_CHILD = ITEMIDLIST
+    global ITEMIDLIST_ABSOLUTE = ITEMIDLIST
+    global LPITEMIDLIST = @*ITEMIDLIST
+    global LPCITEMIDLIST = @*ITEMIDLIST
+    global PIDLIST_ABSOLUTE = @*ITEMIDLIST_ABSOLUTE
+    global PCIDLIST_ABSOLUTE = @*ITEMIDLIST_ABSOLUTE
+
+    global BROWSEINFOW : type <cimport,nodecl> = @record {
+        hwndOwner: HWND,
+        pidlRoot: PCIDLIST_ABSOLUTE,
+        pszDisplayName: LPWSTR,
+        lpszTitle: LPCWSTR,
+        ulFlags: UINT,
+        lpfn: BROWSECBPROC,
+        lParam: LPARAM,
+        iImage: cint
+    }
+    global LPBROWSEINFOW = @*BROWSEINFOW
+
+    global MENUITEMINFO = @record
+    {
+        cbSize : UINT,
+        fMask : UINT,
+        fType : UINT,
+        fState : UINT,
+        wID : UINT,
+        hSubMenu : HMENU,
+        hbmpChecked : HBITMAP,
+        hbmpUnchecked : HBITMAP,
+        dwItemData : ULONG_PTR,
+        dwTypeData : LPWSTR,
+        cch : UINT,
+        hbmpItem : HBITMAP,
+    }
+    global LPCMENUITEMINFO = @*MENUITEMINFO
+
+    global MEASUREITEMSTRUCT = @record
+    {
+        CtlType: UINT,
+        CtlID: UINT,
+        itemID: UINT,
+        itemWidth: UINT,
+        itemHeight: UINT,
+        itemData: ULONG_PTR,
+    }
+    global LPMEASUREITEMSTRUCT = @*MEASUREITEMSTRUCT
+
+    global DRAWITEMSTRUCT = @record {
+        ctlType : UINT,
+        ctlID: UINT,
+        itemID: UINT,
+        itemAction: UINT,
+        itemState : UINT,
+        hwndItem : HWND,
+        hDC : HDC,
+        rcItem : RECT,
+        itemData : DWORD_PTR,
+    }
+    global LPDRAWITEMSTRUCT = @*DRAWITEMSTRUCT
 
 --End of Structs
 
@@ -386,6 +489,55 @@ global RDW_UPDATENOW : UINT <comptime> = 256
         global DT_HIDEPREFIX : UINT <comptime> = 0x00100000
         global DT_PREFIXONLY : UINT <comptime> = 0x00200000
     -- End of DrawText Constants
+
+    -- Menu Constants
+        global MF_POPUP : DWORD <comptime> = 0x00000010
+        global MF_STRING : DWORD <comptime> = 0x00000000
+        global MF_SEPARATOR : DWORD <comptime> = 0x00000800
+        global MF_CHECKED : DWORD <comptime> = 0x00000008
+        global MNS_NOTIFYBYPOS : DWORD <comptime> = 0x08000000
+
+        global MIM_STYLE : DWORD <comptime> = 0x00000010
+        global TPM_LEFTBUTTON : DWORD <comptime> = 0x0000
+        global TPM_RIGHTBUTTON : DWORD <comptime> = 0x0002
+        global MF_OWNERDRAW : DWORD <comptime> = 0x00000100
+
+        global MIIM_STATE : DWORD <comptime> = 0x00000001
+        global MIIM_ID : DWORD <comptime> = 0x00000002
+        global MIIM_SUBMENU : DWORD <comptime> = 0x00000004
+        global MIIM_CHECKMARKS : DWORD <comptime> = 0x00000008
+        global MIIM_TYPE : DWORD <comptime> = 0x00000010
+        global MIIM_DATA : DWORD <comptime> = 0x00000020
+        global MIIM_STRING : DWORD <comptime> = 0x00000040
+        global MIIM_BITMAP : DWORD <comptime> = 0x00000080
+        global MIIM_FTYPE : DWORD <comptime> = 0x00000100
+        global MIM_MENUDATA : DWORD <comptime> = 0x00000008
+
+        global MF_INSERT : DWORD <comptime> = 0x00000000
+        global MF_CHANGE : DWORD <comptime> = 0x00000080
+        global MF_APPEND : DWORD <comptime> = 0x00000100
+        global MF_DELETE : DWORD <comptime> = 0x00000200
+        global MF_REMOVE : DWORD <comptime> = 0x00001000
+        global MF_BYCOMMAND : DWORD <comptime> = 0x00000000
+        global MF_BYPOSITION : DWORD <comptime> = 0x00000400
+        global MF_ENABLED : DWORD <comptime> = 0x00000000
+        global MF_GRAYED : DWORD <comptime> = 0x00000001
+        global MF_DISABLED : DWORD <comptime> = 0x00000002
+        global MF_UNCHECKED : DWORD <comptime> = 0x00000000
+
+        global MF_USECHECKBITMAPS : DWORD <comptime> = 0x00000200
+        global MF_BITMAP : DWORD <comptime> = 0x00000004
+        global MF_MENUBARBREAK : DWORD <comptime> = 0x00000020
+        global MF_MENUBREAK : DWORD <comptime> = 0x00000040
+        global MF_UNHILITE : DWORD <comptime> = 0x00000000
+        global MF_HILITE : DWORD <comptime> = 0x00000080
+        global MF_DEFAULT : DWORD <comptime> = 0x00001000
+        global MF_SYSMENU : DWORD <comptime> = 0x00002000
+        global MF_HELP : DWORD <comptime> = 0x00004000
+        global MF_RIGHTJUSTIFY : DWORD <comptime> = 0x00004000
+        global MF_MOUSESELECT : DWORD <comptime> = 0x00008000
+        global MF_END : DWORD <comptime> = 0x00000080
+    --End of Menu Constnts
 -- End of Common Constants
 
 
@@ -411,8 +563,12 @@ global function Ptr32ToPtr(p: pointer): pointer <cimport,nodecl> end
 global function Handle32ToHandle(h: pointer): pointer <cimport,nodecl> end
 global function PtrToPtr32(p: pointer): pointer <cimport,nodecl, cinclude 'winuser.h'> end
 global function MapWindowPoints(hf: HWND, ht: HWND, lpp: LPPOINT, cp: UINT): cint <cimport,nodecl, cinclude 'winuser.h'> end
-
-
+global function CreatePopupMenu(): HMENU <cimport,nodecl> end
+global function InsertMenuItemW(hm: HMENU, item: UINT, fby: BOOL, lpmi: LPCMENUITEMINFO): BOOL <cimport,nodecl> end
+global function FrameRect(dch : HDC, rct : LPRECT, hbr : HBRUSH) : cint <cimport,nodecl> end
+global function DrawTextW(hdc : HDC, lp_txt : LPCWSTR, cch_txt : cint, lprc : LPRECT, format : UINT) : cint <cimport,nodecl> end
+global function TrackPopupMenu(hmenu: HMENU, uFlags: UINT, x: cint, y: cint, nReserved: cint, hwnd: HWND, prc: LPRECT) : cint <cimport,nodecl> end
+global function DestroyMenu(hmenu: HMENU) : BOOL <cimport,nodecl> end
 
 
 global function makeIntResW(i : auto) : LPCWSTR return (@LPCWSTR)((pointer)((@*culong)(i))) end
@@ -520,13 +676,20 @@ global function MoveToEx(hdc: HDC, x: cint, y : cint, lppt: LPPOINT) : BOOL <cim
 global function LineTo(hdc: HDC, x: cint, y : cint) : BOOL <cimport,nodecl> end
 global function Rectangle(hdc: HDC, left: cint, top: cint, right: cint, bottom: cint): BOOL <cimport,nodecl> end
 
+global function GetOpenFileNameW(lpOfn: LPOPENFILENAMEW): BOOL <cimport,nodecl> end
+global function GetSaveFileNameW(lpOfn: LPOPENFILENAMEW): BOOL <cimport,nodecl> end
 
+global function SHBrowseForFolderW(p1: LPBROWSEINFOW): PIDLIST_ABSOLUTE <cimport,nodecl> end
+global function SHGetPathFromIDListW(p1: PCIDLIST_ABSOLUTE, p2: LPWSTR): BOOL <cimport,nodecl> end
+
+global function CoTaskMemFree(p1: LPVOID) <cimport,nodecl> end
 
 
 
 --Utility Funcs
 
     local CP_UTF8: cuint <comptime> = 65001
+
     local function utf8_to_utf16(s: string): wstring
         local len: cint = MultiByteToWideChar(CP_UTF8, 0, s.data, s.size, nilptr, 0)
         --if len <= 0 then return wstring{} end -- empty or failed
@@ -536,8 +699,10 @@ global function Rectangle(hdc: HDC, left: cint, top: cint, right: cint, bottom: 
             return wstring{}
         end
         data[len] = 0 -- set 0
+        -- print(string.format("Text: %s,      In length: %d,    Out length: %d", s, #s, data.size))
         return (@wstring){data=data}
     end
+
     global function toUTF16(str : string) : LPCWSTR
         local result : wstring = utf8_to_utf16(str)
         return &result.data[0]
@@ -574,6 +739,7 @@ global function Rectangle(hdc: HDC, left: cint, top: cint, right: cint, bottom: 
         end
         return s
     end
+
 
 
 --End Utility funcs

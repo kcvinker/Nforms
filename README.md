@@ -14,6 +14,8 @@ require "nforms"
 local frm = Form.new("NForms GUI Library Window", 800, 550)
 frm:createHandle()
 
+
+
 local b1 = Button.new{frm, "Normal Btn", create = true}
 local b2 = Button.new{frm, "Flat Color", xpos = right(b1, 10), 10, create = true}
 b2:setBackColor(0xfdc500)
@@ -48,11 +50,13 @@ lbx:addItems("Windows", "MacOS", "Linux", "ReactOS")
 local lv = ListView.new{frm, width = 330, height = 175, xpos = right(lbx, 10), ypos = bottom(b1, 10), create = true}
 -- lv:addColumnsEx("Windows", "Linux", "MacOS", 100, 120, 100)
 lv:addColumns({"Windows", "Linux", "MacOS"}, {100, 120, 100})
-lv:addRowEx({"Win7", "openSUSE", "Mojave"})
-lv:addRowEx({"Win8", "Debian", "Catalina"})
-lv:addRowEx({"Win10", "Fedora", "Big Sur"})
-lv:addRowEx({"Win11", "Ubuntu", "Monterey"})
+lv:addRow({"Win7", "openSUSE", "Mojave"})
+lv:addRow({"Win8", "Debian", "Catalina"})
+lv:addRow({"Win10", "Fedora", "Big Sur"})
+lv:addRow({"Win11", "Ubuntu", "Monterey"})
 
+--Adding a context menu to list view. Pipe('|') symbol is for a separator.
+lv:addContextMenu({"Windows", "Linux", "MacOS", "|", "ReactOS"}) 
 
 -- -- --local lb3 = Label.new{frm, "Enter Name", xpos = 10, bottom(gb2, 14), create = true}
 local tb = TextBox.new{frm, "Name here", xpos = 10, bottom(gb2, 10), create = true}
@@ -72,6 +76,12 @@ tv:addNodeWithChilds("MacOS", "Mojave (10.14)", "Catalina (10.15)", " Big Sur (1
 function onTrackChange(bn: pointer, e: *EventArgs)
 	pgb:setValue(tkb.value)
 end
+
+-- Click event handler for first context menu 
+local function cmenuClick(c: *MenuItem, e: *EventArgs)
+	print("Windows menu clicked")
+end
+lv.contextMenu.menus[0].onClick = &cmenuClick
 
 frm:show() -- All set. Now, we can show our form.
 

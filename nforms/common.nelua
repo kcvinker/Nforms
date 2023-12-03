@@ -2,10 +2,11 @@
 
 require "nforms.apifuncs"
 require "nforms.events"
+require "nforms.controls"
 
 global subClassID : UINT_PTR = 1000 -- global subclass id.
-global GradColor = @record {c1: Color, c2: Color,} -- Users of this record - Button & Form
-global TextAlign = @enum {Left = 0, Center, Right}
+
+
 
 global colorWhite = Color.new(0xFFFFFF)
 global colorBlack = Color.new(0x000000)
@@ -58,15 +59,7 @@ global UINT_MAX <comptime> = 1 << 32
 
 --End
 
-global ControlType = @enum
-{	Form = 0, Button, Calendar, CheckBox, ComboBox, DateTimePicker, GroupBox,
-	Label, ListBox, ListView, NumberPicker, ProgressBar, RadioButton,
-	TextBox, TrackBar, TreeView
-}
-
-global Control = @record {data: pointer, dtype: ControlType }
-
-global function createControl(ctrl: auto)
+global function createControl(ctrl: ControlConcept)
 	local ctrlTxt : LPCWSTR = ctrl.text and toUTF16(ctrl.text) or nilptr
 	ctrl.handle = CreateWindowExW(ctrl._exStyle, ctrl.className, ctrlTxt, ctrl._style,
 									ctrl.xpos, ctrl.ypos, ctrl.width, ctrl.height,
@@ -91,7 +84,6 @@ global function getMappedRect(ctl: auto) : RECT
 	return rct
 end
 
-
 global function right(ctl: auto, value: number) : integer
 	return getMappedRect(ctl).right + value
 end
@@ -100,12 +92,18 @@ global function bottom(ctl: auto, value: number) : integer
 	return getMappedRect(ctl).bottom + value
 end
 
-
-
 global function getXFromLPARAM(lpm: LPARAM) : integer return (@integer)(loWord(lpm)) end
 global function getYFromLPARAM(lpm: LPARAM) : integer return (@integer)(hiWord(lpm)) end
 global function getMousePos(lpm: LPARAM): POINT 
 	return {(@integer)(loWord(lpm)), (@integer)(hiWord(lpm))}
+end
+
+global function getMousePosOnMsg() : POINT
+	local result : POINT
+    local dw_value = GetMessagePos()
+    result.x = LONG(loWord(dw_value))
+    result.y = LONG(hiWord(dw_value))
+	return result
 end
 
 global function increment(x: auto): auto
@@ -117,6 +115,10 @@ global function printMsg(txt: string, ms: UINT)
 	local cnt = 1
 	print(string.format("[%d] %s : %d", cnt, txt, ms))
 	cnt = cnt + 1
+end
+
+global function printRect(rc: RECT, msg: string)
+	print(string.format("[%s] Left : %d, Top : %d, Right : %d, Bottom : %d", msg, rc.left, rc.top, rc.right, rc.bottom))
 end
 
 --Set subclass for a control type.
@@ -272,7 +274,6 @@ end
 	end
 -- End of Event handlers
 
-
 -- Public common setter functions
 	-- global function setForeColor(this: auto, clr: uinteger)
 	-- 	this.foreColor = Color.new(clr)
@@ -301,6 +302,11 @@ end
 		ctl.foreColor = Color.new(clr)
 		if (ctl._drawFlag & 1) ~= 1 then ctl._drawFlag = ctl._drawFlag + 1 end
 	end
+
+	global function	wchars_to_utf8(wcarray: span(WCHAR)) : string
+		local ws = (@wstring){data = wcarray}
+		return toUTF8(ws)
+	end	
 
 --End
 

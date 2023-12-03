@@ -3,7 +3,7 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
 
 --Constants
@@ -49,73 +49,7 @@ local swp_flag = SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER
 local function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function npEditWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global NumberPicker = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-    minRange: number,
-    maxRange: number,
-    textAlign: TextAlign,
-	buttonLeft: boolean,
-    hasSeperator: boolean,
-	autoRotate: boolean,
-	hideCaret: boolean,
-    value: number,
-    step: number,
-    formatString: string,
-    decimalPrecision: integer,
-    trackMouseLeave: boolean, -- Set this true if you want to use mouse enter and/or mouse leave events
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-    _buddyStyle: DWORD,
-    _buddyExStyle: DWORD,
-    _topEdgeFlag: DWORD,
-    _botEdgeFlag: DWORD,
-    _buddyHwnd: HWND,
-    _buddySCID: UINT_PTR,
-    _buddyRect: RECT,
-    _updRect: RECT,
-    _myRect: RECT,
-    _txtPos: TextAlign,
-    _lineX: integer,
-    _buddyCID: integer,
-    _dwTxtFlag: DWORD,
-    _trackMouseLeave: boolean,
-    _keyPressed: boolean,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,	
-	onValueChanged: EventHandler,
-	onKeyDown: KeyEventHandler,
-	onKeyUp: KeyEventHandler,
-	onKeyPress: KeyEventHandler,
-}
+
 
 function NumberPicker:createHandle() <forwarddecl> end
 function NumberPicker:setDecimalPlace(value: integer) <forwarddecl> end
@@ -161,6 +95,11 @@ function NumberPicker.new(params: NumberPickerParams) : *NumberPicker
 	this.onValueChanged = params.evtFn
 	if params.create then this:createHandle() end
 	return this
+end
+
+function NumberPicker:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
 end
 
 --Private function
@@ -317,6 +256,9 @@ function npWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case MM_MOUSE_RB_CLICK then rightMouseClickHandler(this)
 	case WM_MOUSEHWHEEL then mouseScrollHandler(this, msg, wpm, lpm)
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
+		
 	case WM_MOUSELEAVE then 
 		if this._trackMouseLeave then
 			if not this:isMouseUponMe() then

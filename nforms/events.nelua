@@ -1,5 +1,7 @@
 --events module - Created on 02-Mar-2023 09:47 AM
 
+-- require 'nforms.controls'
+
 global function loWord(x: auto): WORD <inline>
     return (@WORD)(x & 0xffff)
 end
@@ -71,11 +73,7 @@ global DateTimeEventArgs = @record {
     handled: boolean,
 }
 
-global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
-global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
-global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
-global SizeEventHandler = @function(ctrl: pointer, eargs: *SizeEventArgs): void
-global DateTimeEventHandler = @function(ctrl: pointer, eargs: *DateTimeEventArgs): void
+
 
 function MouseEventArgs.new(msg: UINT, wpm: WPARAM, lpm: LPARAM)
     local fwKeys = (@WORD)(wpm & 0xffff)
@@ -125,3 +123,4 @@ function DateTimeEventArgs.new(dtpStr: LPCWSTR): DateTimeEventArgs
     this.dateString = wcharArrayToString(dtpStr)
     return this
 end
+

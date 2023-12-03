@@ -3,7 +3,7 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
 
 --Constants
@@ -75,75 +75,7 @@ local tvNumber = 1
 local tvClass = toUTF16("SysTreeView32")
 local function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global NodeOps = @enum {AddNode = 0, InsertNode, AddChild, InsertChild }
 
-global TreeNode = @record {
-	handle: HTREEITEM,
-	treeHwnd: HWND,
-	parentNode: *TreeNode,
-	imageIndex: integer,
-	selImageIndex: integer,
-	childCount: integer,
-	index: integer,
-	nodeCount: integer,
-	nodeID: integer,
-	checked: boolean,	
-	_isCreated: boolean,
-	foreColor: Color,
-	backColor: Color,
-	text: string,
-	nodes: vector(TreeNode),
-}
-
-global TreeView = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-	--TreeView's unique properties
-	lineColor: Color,
-	noLine: boolean,
-    noButton: boolean,
-	hasCheckBox: boolean,
-	fullRowSelect: boolean,
-	isEditable: boolean,
-	showSelection: boolean,
-	hotTrack: boolean,
-	nodeCount: integer,
-	selectedNode: TreeNode,
-	nodes: vector(TreeNode),
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-    _uniqNodeID: integer,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,	
-}
 
 function TreeView:createHandle() <forwarddecl> end
 global TreeViewParams = @record
@@ -339,6 +271,11 @@ function TreeView:insertChildNodeEx(node: *TreeNode, parentNode: *TreeNode, inde
 	self:addNodeInernal(NodeOps.InsertChild, node, parentNode, index)
 end
 
+function TreeView:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
+end
+
 function TreeView:addNodeWithChilds(...: varargs)
 	local items : vector(string)
 	## for i=1,select('#', ...) do
@@ -383,6 +320,8 @@ function tvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
 	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)	
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
 
     -- case MM_NOTIFY_REFLECT then
     --     local nmh = (@LPNMHDR)(lpm)

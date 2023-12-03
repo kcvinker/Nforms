@@ -17,12 +17,18 @@
 	--------------------------------------------------
 ]]
 
+
 require "nforms.api_messages"
 require "nforms.apifuncs"
 require "nforms.color"
 require "nforms.font"
 require "nforms.common"
-require 'hashmap'
+require "nforms.controls"
+require "hashmap"
+
+
+
+-- require 'nelua.utils.fs'
 
 --Window constants
 	local CS_VREDRAW  : DWORD <comptime> = 0x0001
@@ -89,6 +95,8 @@ require 'hashmap'
 	global WS_EX_NOPARENTNOTIFY : DWORD  <comptime> = 0x00000004
 	global WS_EX_TRANSPARENT : DWORD  <comptime> = 0x00000020
 
+	local menuTxtFlag :DWORD <comptime> = DT_LEFT | DT_SINGLELINE | DT_VCENTER
+
 	-- Different window styles
 	local fixedSingleExStyle: DWORD = WS_EX_LEFT|WS_EX_LTRREADING|WS_EX_RIGHTSCROLLBAR|WS_EX_WINDOWEDGE|WS_EX_CONTROLPARENT|WS_EX_APPWINDOW
 	local fixedSingleStyle : DWORD = WS_OVERLAPPED|WS_TABSTOP|WS_MAXIMIZEBOX|WS_MINIMIZEBOX|WS_GROUP|WS_SYSMENU|WS_DLGFRAME|WS_BORDER|WS_CAPTION|WS_CLIPCHILDREN|WS_CLIPSIBLINGS
@@ -111,129 +119,19 @@ require 'hashmap'
 -- 	return nilptr
 -- end
 -- Just to hold some app level informations.
-local Application = @record
-{
-	started : boolean,
-	mainLoopStarted: boolean,
-	hInstance : HINSTANCE,
-	className : string,
-	frmCount : integer,
-	screenWidth: integer,
-	screenHeight: integer,
-	mainWinHandle: HWND,
-	isDateInit: boolean,
-	iccEx: INITCOMMONCONTROLSEX,
-}
 
+-- /////////////////////////////////
 global app : Application
-
-
+-- ////////////////////////////////
 
 local function windowProc(hw : HWND, msg: cuint, wp: WPARAM, lp: LPARAM): LRESULT <forwarddecl> end
 local function regWindow() <forwarddecl> end
+function ContextMenu:show(lpm: LPARAM) <forwarddecl> end
+function MenuBar:createHandle() <forwarddecl> end
+
 -- local function getChildControl(ctl: pointer, ctype: ControlType) : auto <forwarddecl> end
-global MenuBar <forwarddecl> = @record{}
-global MenuItem <forwarddecl> = @record{}
 -- global MenuClickHandler: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
-global FormStyle = @enum {None = 0, FixedSingle, Fixed3D, FixedDialog, FixedTool, Sizable, SizableTool, Hidden}
-global FormState = @enum {Normal = 0, Maximized, Minimized}
-global FormPosition = @enum {Center = 0, TopLeft, TopMid, TopRight, MidLeft, MidRight, BottomLeft, BottomMid, BottomRight, Manual}
-global FormDrawMode = @enum {Default = 0, FlatColor, Gradient}
 
-global Form = @record
-{
-	name : string,
-	text : string,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	handle : HWND,
-	maximizeBox: boolean,
-	minimizeBox: boolean,
-	topMost: boolean,
-	formState: FormState,
-	formPos: FormPosition,
-	hInstance : HINSTANCE,
-	backColor: Color,
-	font: Font,
-	style: FormStyle,
-	menuBar: *MenuBar,
-	comboMap : hashmap(HWND, HWND),
-
-	-- Private properties
-	_count: uinteger, -- To know how many forms are there
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_winStyle: DWORD,
-	_exStyle: DWORD,
-	_drawMode: FormDrawMode, -- To specify the way form's back gorund is draw
-	_lbDown: boolean, -- To specify left mouse button is down
-	_rbDown: boolean, -- To specify right mouse button is down
-	_isMouseEntered: boolean,
-	_isMouseTracking: boolean,
-	_gdraw: GradColor, -- To hold the two gradient colors
-	_topToBottom: boolean, -- To specify gradient drawing position
-	_cidNumber: integer,
-	_menuNumber: integer,
-	_menuList: vector(*MenuItem),
-	_controls: vector(Control),
-
-	-- Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	onClosing: EventHandler,
-	onClosed: EventHandler,
-	onMinimized: EventHandler,
-	onMaximized: EventHandler,
-	onRestored: EventHandler,
-	onKeyDown: KeyEventHandler,
-	onKeyUp: KeyEventHandler,
-	onKeyPress: KeyEventHandler,
-	onSizeChanging: SizeEventHandler,
-	onSizeChanged: SizeEventHandler,
-	onMoving: EventHandler,
-	onMoved: EventHandler,
-	onActivate: EventHandler,
-	onDeActivate: EventHandler,
-	onLoad: EventHandler,
-}
-
-global MenuType = @enum{BaseMenu = 0, NormalItem, DropDownItem, Seperator}
-
-MenuItem = @record
-{
-	handle: HMENU,
-	parentHandle: HMENU,
-  	menuID: UINT,
-  	_byPos: boolean,
-  	checked: boolean,
-  	_isCreated: boolean,
-  	text: string,
-  	menuType: MenuType,
-  	_parent: *MenuItem,
-  	_flag: UINT,
-  	formPtr: *Form,
-  	onClick: EventHandler,
-	menus: vector(*MenuItem)
-}
-
-MenuBar = @record
-{
-	formPtr: *Form,
-	handle: HMENU,
-	font: Font,
-	idNum: integer,
-	menus: vector(*MenuItem)
-}
 
 function Form.new(title: string, width: integer, height: integer ) : *Form --Constructor
 	local this : *Form = default_allocator:new(@Form)
@@ -250,29 +148,40 @@ function Form.new(title: string, width: integer, height: integer ) : *Form --Con
 	this.backColor = Color.new(0xF0EFEB)
 	this._isTextable = true
 	this._cidNumber = 100
-	this._menuNumber = 100
 	return this
 end
 
+
+##[[
+	local function getIconPath()
+		require'nelua.utils.fs'
+		local x = fs.scriptname()
+		local y = fs.dirname(x)
+		return string.format("%s\\nforms_icon.ico", y)
+	end
+]]##
+
+
 --Private function
 function regWindow()
+	local ico = toUTF16(#[getIconPath()]#)
 	app.className = "NForms_Window_Nelua"
 	app.hInstance = GetModuleHandleW(nilptr)
-	local icon = toUTF16(".\\nforms\\feather.ico")
+	app.menuNumber = 100
 	local wcEx : WNDCLASSEXW
-	local clr : COLORREF = (@COLORREF)(0x00EBEFF0)
+	local clr = (@COLORREF)(0x00EBEFF0)
 	wcEx.cbSize = #WNDCLASSEXW
 	wcEx.style = CS_HREDRAW|CS_VREDRAW
 	wcEx.lpfnWndProc = windowProc
 	wcEx.cbClsExtra = 0
 	wcEx.cbWndExtra = 256
 	wcEx.hInstance = app.hInstance
-	wcEx.hIcon = LoadImageW(nilptr, icon, 1, 0, 0, 16|64)
+	wcEx.hIcon = LoadImageW(nilptr, ico, 1, 0, 0, 16|64)
 	wcEx.hCursor = LoadCursorW(nilptr, IDC_ARROW)
 	wcEx.hbrBackground = (@HBRUSH)(CreateSolidBrush(clr))  --(@HBRUSH)(6)
 	wcEx.lpszMenuName = nilptr
 	wcEx.lpszClassName = toUTF16(app.className)
-	local x = RegisterClassExW(&wcEx)
+	RegisterClassExW(&wcEx)
 end
 
 --Private function
@@ -393,6 +302,7 @@ end
 function Form:show()
 	ShowWindow(self.handle, SW_SHOW)
 	UpdateWindow(self.handle)
+	if self.menubar ~= nilptr then self.menubar:createHandle() end
 	if not app.mainLoopStarted then
 		app.mainLoopStarted = true
 		app.mainWinHandle = self.handle
@@ -433,23 +343,73 @@ function Form:setBKGInternal(wpm: WPARAM) : LRESULT
 end
 
 --Private function
-function Form:getMenuItem(menuId: UINT): *MenuItem
-	if #self._menuList > 0 then
-		for _,menu in ipairs(self._menuList) do
-			if menu.menuID == menuId then return menu end
+	function Form:getMenuItem(menuId: UINT): *MenuItem
+		if #self._menuList > 0 then
+			for _,menu in ipairs(self._menuList) do
+				if menu.menuID == menuId then return menu end
+			end
 		end
+		return nilptr
 	end
-	return nilptr
-end
 
-local function trackMouse(hw: HWND)
-	local tme : TRACKMOUSEEVENT
-    tme.cbSize = #TRACKMOUSEEVENT
-    tme.dwFlags = TME_HOVER | TME_LEAVE
-    tme.dwHoverTime = HOVER_DEFAULT
-    tme.hwndTrack = hw
-    TrackMouseEvent(&tme)
-end
+	local function trackMouse(hw: HWND)
+		local tme : TRACKMOUSEEVENT
+	    tme.cbSize = #TRACKMOUSEEVENT
+	    tme.dwFlags = TME_HOVER | TME_LEAVE
+	    tme.dwHoverTime = HOVER_DEFAULT
+	    tme.hwndTrack = hw
+	    TrackMouseEvent(&tme)
+	end
+
+	function Form:_handleWmMeasureItem(lpm: LPARAM): LRESULT
+		local pmi = (@LPMEASUREITEMSTRUCT)(lpm)
+        local mi = (@*MenuItem)(pmi.itemData)
+        -- ptf("wm measure item - menu name : %s\n", mi.text)
+        if mi.kind == MenuType.BaseMenu or mi.kind == MenuType.DropDownMenu then
+            local hdc = GetDC(self.handle)
+            local size : SIZE
+            GetTextExtentPoint32W(hdc, mi._wideText, #mi.text, &size)
+            ReleaseDC(self.handle, hdc)
+            pmi.itemWidth = size.cx
+            pmi.itemHeight = size.cy + 10
+        else
+            pmi.itemWidth = 150
+            pmi.itemHeight = 25
+        end
+        return (@LRESULT)(1)
+	end
+
+	function Form:_handleWmDrawItem(lpm: LPARAM) : LRESULT
+		local dis = (@LPDRAWITEMSTRUCT)(lpm)
+        local mi = (@*MenuItem)(dis.itemData)
+        --ptf("wm draw item - menu name : %s\n", mi.text)
+        local txtClrRef = mi.fgColor.ref
+        if dis.itemState == 320 or dis.itemState == 257 then
+            local rc : RECT
+            if mi._isEnabled then
+                rc = RECT{dis.rcItem.left + 4, dis.rcItem.top + 2, dis.rcItem.right, dis.rcItem.bottom - 2}
+                FillRect(dis.hDC, &rc, self.menubar._menuHotBgBrush)
+                FrameRect(dis.hDC, &rc, self.menubar._menuFrameBrush)
+                txtClrRef = 0x00000000
+            else
+                FillRect(dis.hDC, &rc, self.menubar._menuGrayBrush)
+                txtClrRef = self.menubar._menuGrayCref
+            end
+       	else
+            -- ptf("draw menu : %s\n", mi.text)
+            FillRect(dis.hDC, &dis.rcItem, self.menubar._menuDefBgBrush)
+            if not mi._isEnabled then txtClrRef = self.menubar._menuGrayCref end
+        end
+
+        SetBkMode(dis.hDC, 1)
+        dis.rcItem.left = mi.kind == MenuType.BaseMenu and dis.rcItem.left + 10 or dis.rcItem.left + 25       
+        SelectObject(dis.hDC, (@HGDIOBJ)(self.menubar.font.handle))
+        SetTextColor(dis.hDC, txtClrRef)
+        DrawTextW(dis.hDC, mi._wideText, -1, &dis.rcItem, menuTxtFlag)
+        return 0
+	end
+
+-- End of private funcs
 
 -- Event Handler functions
 
@@ -632,6 +592,8 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 	case WM_CLOSE then if this:wmCloseHandler() then return 0 end
 	case WM_ACTIVATEAPP then this:wmActivateAppHandler(wpm)
 	case WM_SHOWWINDOW then this:wmShowWindowHandler()
+	case WM_MEASUREITEM then return this:_handleWmMeasureItem(lpm) 
+	case WM_DRAWITEM then return this:_handleWmDrawItem(lpm)
 
 	case WM_COMMAND then
 		switch hiWord(wpm) do
@@ -646,6 +608,9 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 			local ctHwnd = (@HWND)(lpm)
 			return SendMessageW(ctHwnd, MM_CTL_COMMAND, wpm, lpm)
 		end
+
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
 
 	case WM_ERASEBKGND then
 		if this._drawMode ~= FormDrawMode.Default then return this:setBKGInternal(wpm) end
@@ -685,114 +650,347 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 	return DefWindowProcW(hw, msg, wpm, lpm)
 end
 
---===========================================MENU RELATED FUNCTIONS=================================================
+-- ===========================================MENU RELATED FUNCTIONS=================================================
 
-function MenuItem.new(pFrm: *Form, txt: string, parent: *MenuItem, mtype: MenuType, isChecked: boolean): *MenuItem
-	local this : *MenuItem = default_allocator:new(@MenuItem)
-	this.text = txt
-    this.menuType = mtype
-    this._byPos = true
-    this.checked = isChecked
-    this.formPtr = pFrm;
-    this.menuID = pFrm._menuNumber
-    if isChecked then this._flag = MF_CHECKED end
-	switch mtype do
-		case MenuType.BaseMenu then this._flag = this._flag | MF_POPUP
-		case MenuType.DropDownItem then this._flag = this._flag | MF_POPUP
-		case MenuType.NormalItem then this._flag = this._flag | MF_STRING
-		case MenuType.Seperator then this._flag = this._flag | MF_SEPARATOR
+	local function menubar_additems_internal(mbar: *MenuBar, items: span(string)) <forwarddecl> end
+
+	function MenuBar:addItems(items: span(string))
+		menubar_additems_internal(self, items)
 	end
-    if parent ~= nilptr then
-        this._parent = parent
-        this.parentHandle = parent.handle
-    end
-    this.handle = CreateMenu()
-    pFrm._menuNumber = pFrm._menuNumber + 1
-    return this
-end
 
-function MenuBar.new(frm: *Form, items: span(string)): *MenuBar
-	local this: *MenuBar = default_allocator:new(@MenuBar)
-	this.formPtr = frm
-    this.font = frm.font
-    this.handle = CreateMenu()
-    for _,item in ipairs(items) do
-        local mi = MenuItem.new(frm, item, nilptr, MenuType.BaseMenu, false)
-        mi.parentHandle = this.handle
-        this.menus:push(mi)
-    end
-
-    return this
-end
-
---Private function
-function MenuItem:changeType()
-	if self.menuType == MenuType.BaseMenu or self.menuType == MenuType.NormalItem then
-		self.menuType = MenuType.DropDownItem
+	function MenuBar.new(frm: *Form, menuitems: span(string)): *MenuBar
+		local this: *MenuBar = default_allocator:new(@MenuBar)
+		this.handle = CreateMenu()
+		this._pForm = frm
+	    this.font = Font.new("Tahoma", 11)
+	    this._menuGrayBrush = Color.getHBrush(0xced4da)
+	    this._menuGrayCref = Color.getColorRef(0x979dac)
+	    this._pForm.menubar = this
+	    menubar_additems_internal(this, menuitems)    
+	    return this
 	end
-end
 
-function MenuBar:addMenu(menuTxt: string): *MenuItem
-	local mi: *MenuItem = MenuItem.new(self.formPtr, menuTxt, nilptr, MenuType.BaseMenu, false)
-	self.menus:push(mi)
-	return mi
-end
-
-function MenuBar:addMenus(menulist: span(string))
-	for _,txt in ipairs(menulist) do
-		local mi: *MenuItem = MenuItem.new(self.formPtr, txt, nilptr, MenuType.BaseMenu, false)
-		self.menus:push(mi)
-	end
-end
-
-function MenuItem:addMenu(txt: string): *MenuItem
-	self:changeType()
-	local mi: *MenuItem = MenuItem.new(self.formPtr, txt, self, MenuType.NormalItem, false)
-	self.menus:push(mi)
-	return mi
-end
-
-function MenuItem:addMenus(menulist: span(string))
-	self:changeType()
-	for _,txt in ipairs(menulist) do
-		local mi: *MenuItem = MenuItem.new(self.formPtr, txt, self, MenuType.NormalItem, false)
-		self.menus:push(mi)
-	end
-end
-
---Private function
-function MenuItem:createHandle()
-	switch self.menuType do
-		case MenuType.BaseMenu, MenuType.DropDownItem then
-			if #self.menus > 0 then
-				for _,menu in ipairs(self.menus) do menu:createHandle() end
-				local ret = AppendMenuW(self.parentHandle, self._flag, (@UINT_PTR)(self.handle), toUTF16(self.text))
+	function MenuItem.new(menutxt: string, mtype: MenuType, pHandle: HMENU, indexNum: uinteger): *MenuItem
+		local this : *MenuItem = default_allocator:new(@MenuItem)
+		if mtype == MenuType.Separator then
+			app.menuNumber = app.menuNumber + 1
+			this.kind = MenuType.Separator
+			this.parentHandle = pHandle
+		else
+			if mtype == MenuType.BaseMenu or mtype == MenuType.DropDownMenu then
+				this._popup = true
 			else
-				-- If we don't have sub menus, we are supposed to act like a normal string menu.
-				self._flag = self._flag ~ MF_POPUP
-				self._flag = self._flag | MF_STRING
-				local ret = AppendMenuW(self.parentHandle, self._flag, self.menuID, toUTF16(self.text))
+				this._popup = false
 			end
-		case MenuType.NormalItem then
-			local ret = AppendMenuW(self.parentHandle, self._flag, self.menuID, toUTF16(self.text))
-		case MenuType.Seperator then AppendMenuW(self.parentHandle, self._flag, 0, nilptr)
+
+		    if this._popup then
+		    	this.handle = CreatePopupMenu()
+		    else
+		    	this.handle = CreateMenu()
+		    end
+
+		    this._index = indexNum
+		    this.idNum = app.menuNumber
+		    this.text = menutxt
+		    this._wideText = toUTF16(this.text)
+		    this.kind = mtype
+		    this.parentHandle = pHandle
+		    this.bgColor = Color.new(0xe9ecef)
+		    this.fgColor = Color.new(0x000000)
+		    this._isEnabled = true
+		    app.menuNumber = app.menuNumber + 1
+		end
+		return this
 	end
-end
 
-function MenuBar:createHandle()
-	if #self.menus > 0 then
-		for _,menu in ipairs(self.menus) do menu:createHandle() end
-		SetMenu(self.formPtr.handle, self	.handle)
+	-- Private
+	function menubar_additems_internal(mbar: *MenuBar, items: span(string))	
+		for _, sitem in ipairs(items) do		
+			local mi = MenuItem.new(sitem, MenuType.BaseMenu, mbar.handle, mbar._menuCount)
+			mbar._menuCount = mbar._menuCount + 1
+			mi._mbar = mbar
+	        mi._formHwnd = mbar._pForm.handle
+	        mi._formMenu = true
+	        mbar.menus[sitem] = mi
+	        mbar._pForm._menuList:push(mi)
+		end   
 	end
-end
 
-function Form:addMenuBar(items: span(string)): *MenuBar
-	local mbar = MenuBar.new(self, items)
-	self.menuBar = mbar
-	return mbar
-end
+	--Private function
+	function MenuItem:changeType()
+		if self.kind == MenuType.BaseMenu or self.kind == MenuType.NormalMenu then
+			self.kind = MenuType.DropDownMenu
+		end
+	end
 
-function MenuItem:setClickHandler(funtPtr: EventHandler)
-	self.onClick = funtPtr
-	SendMessageW(self.formPtr.handle, MM_MENU_EVENT, 0, (@LPARAM)((@pointer)(self)))
-end
+	function MenuBar:addItem(menuTxt: string): *MenuItem
+		local mtype = menuTxt == "|" and MenuType.Separator or MenuType.BaseMenu
+		local mi: *MenuItem = MenuItem.new(menuTxt, mtype, self.handle, self._menuCount)
+		mi._mbar = self
+		self._menuCount =  self._menuCount + 1
+		self.menus[menuTxt] = mi
+		self._pForm._menuList:push(mi)
+		return mi
+	end
+
+	function MenuItem:addItem(txt: string): *MenuItem
+		-- self:changeType()
+		self._popup = true
+		local mi: *MenuItem = MenuItem.new(txt, MenuType.NormalMenu, self.handle, self._menuCount)
+		mi._formHwnd = self._formHwnd
+		mi._formMenu = true
+		mi._mbar = self._mbar
+		self._menuCount =  self._menuCount + 1
+		self.menus[txt] = mi
+		self._mbar._pForm._menuList:push(mi)
+		return mi
+	end
+
+	function MenuItem:addItems(menuitems: span(string))
+		-- self:changeType()	
+		for _, sitem in ipairs(menuitems) do
+			local typ : MenuType = sitem == "|" and MenuType.Separator or MenuType.NormalMenu
+			-- if typ == MenuType.Seperator then sitem = nil end
+			local mi = MenuItem.new(sitem, typ, self.handle, self._menuCount)
+			self._menuCount =  self._menuCount + 1
+	        mi._formHwnd = self._mbar._pForm.handle
+	        mi._mbar = self._mbar
+	        mi._formMenu = true
+	        self.menus[sitem] = mi
+	        self._mbar._pForm._menuList:push(mi)
+		end
+	end
+
+	function MenuItem:insertMenuInternal()
+		local mii : MENUITEMINFO
+	    mii.cbSize = #MENUITEMINFO
+	    mii.fMask = MIIM_ID | MIIM_TYPE | MIIM_DATA | MIIM_SUBMENU | MIIM_STATE
+	    mii.fType = MF_OWNERDRAW
+	    mii.dwTypeData = self._wideText
+	    mii.cch = #self.text
+	    mii.dwItemData =  (@ULONG_PTR)((self))
+	    mii.wID = self.idNum
+	    mii.hSubMenu = self._popup and self.handle or nilptr
+	    InsertMenuItemW(self.parentHandle, self.idNum, 1, &mii)
+	    self._isCreated = true
+
+	end
+
+	--Private function
+
+	function MenuItem:createHandle()
+		-- print(string.format("Menu handle for %s is %d", self.text, (@integer)(self.handle)))
+		switch self.kind do
+		case MenuType.BaseMenu, MenuType.DropDownMenu then
+			if self._menuCount > 0 then			
+				for _, menu in pairs(self.menus) do						
+					menu:createHandle() 					
+				end
+			end
+			self:insertMenuInternal()	
+			
+		case MenuType.NormalMenu then self:insertMenuInternal()
+		case MenuType.Separator then 
+			-- print(string.format("p handle in sep : %d", (@integer)(self.parentHandle)))
+			AppendMenuW(self.parentHandle, MF_SEPARATOR, 0, nilptr)
+		end
+	end
+
+	function MenuBar:createHandle()
+		self._menuDefBgBrush = Color.getHBrush(0xe9ecef)
+	    self._menuHotBgBrush = Color.getHBrush(0x90e0ef)
+	    self._menuFrameBrush = Color.getHBrush(0x0077b6)
+		if self.font.handle == nilptr then self.font:createHandle() end
+
+	    -- If there are menus, we need to create the handles for them too.
+	    if self._menuCount > 0 then	    	
+			for _, menu in pairs(self.menus) do 
+				menu:createHandle() 
+			end
+		end
+	    SetMenu(self._pForm.handle, self.handle)
+	end
+
+	function Form:addMenuBar(items: span(string)): *MenuBar
+		local mbar = MenuBar.new(self, items)
+		self.menubar = mbar
+		return mbar
+	end
+-- End of MenuBar related code
+
+-- ===========================================Context Menu==============================================================
+	local function cmenuWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
+	
+	local function createDummyControl(pHwnd: HWND): HWND
+		return CreateWindowExW(0, toUTF16("Button"), nilptr, WS_CHILD, 
+								0, 0, 0, 0, pHwnd, nilptr, app.hInstance, nilptr)
+	end	
+
+	function ContextMenu.new(ctl: ControlConcept) : *ContextMenu	
+		local this : *ContextMenu = default_allocator:new(@ContextMenu)
+	    this.parent = ctl
+	    this.handle = CreatePopupMenu()
+	    this._rightClick = true
+	    this.font = ctl.font
+	    this.width = 120
+	    this.height = 25
+	    this._defBgBrush = Color.getHBrush(0xe9ecef)
+	    this._hotBgBrush = Color.getHBrush(0x90e0ef)
+	    this._borderBrush = Color.getHBrush(0x0077b6)
+	    -- this._selTxtClr = Color.new(0x000000)
+	    this._grayBrush = Color.getHBrush(0xced4da)
+	    this._grayCref = Color.getColorRef(0x979dac)
+	    this._dummyHwnd = createDummyControl(ctl.handle)
+	    setSubClass(this._dummyHwnd, this, cmenuWndProc)
+	    return this
+	end	
+
+	global function addContextMenu(ctl: ControlConcept, items: span(string))
+		local cmenu = ContextMenu.new(ctl)
+		ctl.contextMenu = cmenu
+		if #items > 0 then
+			for _, item in ipairs(items) do
+				local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
+	            local mi = MenuItem.new(item, mtyp, cmenu.handle, cmenu._menuCount)
+	            cmenu._menuCount = cmenu._menuCount + 1
+	            if mtyp == MenuType.ContextMenu then
+	                mi:insertMenuInternal()
+	                cmenu.menus:push(mi)
+	            elseif mtyp == MenuType.Separator then
+	                AppendMenuW(cmenu.handle, MF_SEPARATOR, 0, nilptr)
+	            end
+			end
+		end	
+	end
+
+	function ContextMenu:addItem(item: string)
+		local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
+        local mi = MenuItem.new(item, mtyp, self.handle, self._menuCount)
+        self._menuCount = self._menuCount + 1
+        if mtyp == MenuType.ContextMenu then
+            mi:insertMenuInternal()
+            self.menus:push(mi)
+        elseif mtyp == MenuType.Separator then
+            AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
+        end
+    end
+
+    function ContextMenu:addItems(items: span(string))
+    	if #items > 0 then
+			for _, item in ipairs(items) do
+				local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
+	            local mi = MenuItem.new(item, mtyp, self.handle, self._menuCount)
+	            self._menuCount = self._menuCount + 1
+	            if mtyp == MenuType.ContextMenu then
+	                mi:insertMenuInternal()
+	                self.menus:push(mi)
+	            elseif mtyp == MenuType.Separator then
+	                AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
+	            end
+			end
+		end	
+    end
+
+    function ContextMenu:show(lpm: LPARAM)
+    	local pt = getMousePos(lpm)
+	    if pt.x == -1 or pt.y == -1 then
+	        -- ContextMenu message generated by keybord shortcut.
+	        -- So we need to find the mouse position.
+	        pt = getMousePosOnMsg()
+	    end
+	    local mBtn : UINT = self._rightClick and TPM_RIGHTBUTTON or TPM_LEFTBUTTON
+	    TrackPopupMenu(self.handle, mBtn, pt.x, pt.y, 0, self._dummyHwnd, nilptr)
+	end
+
+	function ContextMenu:getMenuItemFromID(idnum: UINT): (*MenuItem, boolean)
+		if #self.menus > 0 then
+	        for _, menu in ipairs(self.menus) do
+	            if menu.idNum == idnum then return menu, true end
+	        end
+	    end
+	    return nilptr, false
+	end
+
+	function Form:addContextMenu(items: span(string))
+		self.contextMenu = ContextMenu.new(self)
+		self.contextMenu:addItems(items)
+	end
+
+	function cmenuWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
+		local cmenu = (@*ContextMenu)((pointer)(refData))
+		switch msg do
+		case WM_DESTROY then 
+			print("cmenu destroyed")
+			DestroyMenu(cmenu.handle)
+			RemoveWindowSubclass(hw, cmenuWndProc, scID)
+
+		case WM_MEASUREITEM then
+	        local pmi = (@LPMEASUREITEMSTRUCT)(lpm)
+	        pmi.itemWidth = cmenu.width
+	        pmi.itemHeight = cmenu.height
+	        return 1
+
+	    case WM_DRAWITEM then
+	        local dis = (@LPDRAWITEMSTRUCT)(lpm)
+	        local mi = (@*MenuItem)(dis.itemData)
+	        local txtClrRef : COLORREF = mi.fgColor.ref
+	        if dis.itemState == 257 then
+	            if mi._isEnabled then 
+	                local rc = RECT{dis.rcItem.left + 4, dis.rcItem.top + 2, dis.rcItem.right, dis.rcItem.bottom - 2}
+	                FillRect(dis.hDC, &rc, cmenu._hotBgBrush)
+	                FrameRect(dis.hDC, &rc, cmenu._borderBrush)
+	                txtClrRef = 0x00000000
+	            else
+	                FillRect(dis.hDC, &dis.rcItem, cmenu._grayBrush)
+	                txtClrRef = cmenu._grayCref
+	            end
+	        else
+	            FillRect(dis.hDC, &dis.rcItem, cmenu._defBgBrush)
+	            if not mi._isEnabled then txtClrRef = cmenu._grayCref end
+	        end
+
+	        SetBkMode(dis.hDC, 1)
+	        dis.rcItem.left = dis.rcItem.left + 25
+	        SelectObject(dis.hDC, cmenu.font.handle)
+	        SetTextColor(dis.hDC, txtClrRef)
+	        DrawTextW(dis.hDC, mi._wideText, -1, &dis.rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER)
+	        return 0
+		
+	    case WM_ENTERMENULOOP then
+	        if cmenu.onMenuShown ~= nilptr then
+	            local ea : EventArgs = {}
+	            cmenu.onMenuShown(cmenu, &ea)
+	        end
+	    case WM_EXITMENULOOP then
+	        if cmenu.onMenuClose ~= nilptr then
+	            local ea : EventArgs = {}
+	            cmenu.onMenuClose(cmenu, &ea)
+	        end
+	    case WM_MENUSELECT then
+	        local idNumber = (@UINT)(loWord(wpm))
+	        local hMenu = (@HMENU)(lpm)
+	        if hMenu ~= nilptr and idNumber > 0 then
+	            local menu, okay = cmenu:getMenuItemFromID(idNumber)
+	            if okay and menu._isEnabled then
+	                if menu.onFocus ~= nilptr then
+	                    local ea : EventArgs = {}
+	                    menu.onFocus(menu, &ea)
+	                end
+	            end
+	        end
+	    case WM_COMMAND then
+	        local idNumber = (@UINT)(loWord(wpm))
+	        if idNumber > 0 then
+	            local menu, okay = cmenu:getMenuItemFromID(idNumber)
+	            if okay and menu._isEnabled then
+	                if menu.onClick ~= nilptr then
+	                    local ea : EventArgs = {}
+	                    menu.onClick(menu, &ea)
+	                end
+	            end
+	        end
+		end
+		return DefSubclassProc(hw, msg, wpm, lpm)
+	end
+
+-- End of Context Menu

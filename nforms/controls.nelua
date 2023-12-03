@@ -1,0 +1,1199 @@
+
+-- controls.nelua - Created on 04-Nov-2023 07:16 PM
+-- Author : kcvinker
+
+require "nforms.apifuncs"
+require 'nforms.events'
+require 'nforms.color'
+
+
+global Application = @record
+{
+	started : boolean,
+	mainLoopStarted: boolean,
+	hInstance : HINSTANCE,
+	className : string,
+	frmCount : integer,
+	screenWidth: integer,
+	screenHeight: integer,
+	mainWinHandle: HWND,
+	isDateInit: boolean,
+	iccEx: INITCOMMONCONTROLSEX,
+	menuNumber: uinteger,
+}
+
+global ControlConcept = #[concept(function(attr)
+	if attr.type.subtype.is_control then return true end
+	return false
+end) ]#
+
+global MenuBar <forwarddecl> = @record{}
+global MenuItem <forwarddecl> = @record{}
+global ContextMenu <forwarddecl> = @record{}
+
+global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
+global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
+global KeyEventHandler = @function(ctrl: pointer, eargs: *KeyEventArgs): void
+global SizeEventHandler = @function(ctrl: pointer, eargs: *SizeEventArgs): void
+global DateTimeEventHandler = @function(ctrl: pointer, eargs: *DateTimeEventArgs): void
+global ContextMenuEventHandler = @function(ctrl: *ContextMenu, eargs: *EventArgs): void
+global MenuEventHandler = @function(ctrl: *MenuItem, eargs: *EventArgs): void
+
+global FormStyle = @enum {None = 0, FixedSingle, Fixed3D, FixedDialog, FixedTool, Sizable, SizableTool, Hidden}
+global FormState = @enum {Normal = 0, Maximized, Minimized}
+global FormPosition = @enum {Center = 0, TopLeft, TopMid, TopRight, MidLeft, MidRight, BottomLeft, BottomMid, BottomRight, Manual}
+global FormDrawMode = @enum {Default = 0, FlatColor, Gradient}
+
+-- global MenuBar <forwarddecl> = @record{}
+-- global MenuItem <forwarddecl> = @record{}
+
+
+global GradColor = @record {c1: Color, c2: Color,} -- Users of this record - Button & Form
+global ControlType = @enum
+{	Form = 0, Button, Calendar, CheckBox, ComboBox, DateTimePicker, GroupBox,
+	Label, ListBox, ListView, NumberPicker, ProgressBar, RadioButton,
+	TextBox, TrackBar, TreeView
+}
+global Control = @record {data: pointer, dtype: ControlType }
+global TextAlign = @enum {Left = 0, Center, Right}
+
+global Form = @record
+{
+	name : string,
+	text : string,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	handle : HWND,
+	maximizeBox: boolean,
+	minimizeBox: boolean,
+	topMost: boolean,
+	formState: FormState,
+	formPos: FormPosition,
+	hInstance : HINSTANCE,
+	backColor: Color,
+	font: Font,
+	style: FormStyle,
+	menubar: *MenuBar,
+	contextMenu: *ContextMenu,
+	comboMap : hashmap(HWND, HWND),
+
+	-- Private properties
+	_count: uinteger, -- To know how many forms are there
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_winStyle: DWORD,
+	_exStyle: DWORD,
+	_drawMode: FormDrawMode, -- To specify the way form's back gorund is draw
+	_lbDown: boolean, -- To specify left mouse button is down
+	_rbDown: boolean, -- To specify right mouse button is down
+	_isMouseEntered: boolean,
+	_isMouseTracking: boolean,
+	_gdraw: GradColor, -- To hold the two gradient colors
+	_topToBottom: boolean, -- To specify gradient drawing position
+	_cidNumber: integer,
+	_menuNumber: integer,
+	_menuList: vector(*MenuItem),
+	_controls: vector(Control),
+	
+
+	-- Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onClosing: EventHandler,
+	onClosed: EventHandler,
+	onMinimized: EventHandler,
+	onMaximized: EventHandler,
+	onRestored: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+	onSizeChanging: SizeEventHandler,
+	onSizeChanged: SizeEventHandler,
+	onMoving: EventHandler,
+	onMoved: EventHandler,
+	onActivate: EventHandler,
+	onDeActivate: EventHandler,
+	onLoad: EventHandler,
+}
+## Form.value.is_control = true
+
+global MenuType = @enum{BaseMenu = 0, NormalMenu, DropDownMenu, ContextMenu, Separator}
+
+MenuItem = @record
+{
+	handle: HMENU,
+	font : Font,
+	parentHandle: HMENU,
+	bgColor: Color,
+	fgColor: Color,
+  	menuID: UINT,
+  	text: string,
+  	kind: MenuType,
+  	hasCheckMark: boolean,
+  	idNum : uinteger,
+  	menus: hashmap(string, *MenuItem),
+
+  	_wideText: LPWSTR,
+  	_index : uinteger,
+  	_evtFlag: uinteger,
+  	_uFlag: uinteger,
+  	_byPos: boolean,
+  	_isEnabled: boolean,
+  	_popup: boolean,
+  	_formMenu: boolean,
+  	_formHwnd: HWND,
+  	_isCreated: boolean,
+  	_menuCount : integer,  	
+  	_parent: *MenuItem,
+  	_mbar: *MenuBar,
+
+  	onClick: MenuEventHandler,
+  	onPopup: MenuEventHandler, 
+  	onCloseup: MenuEventHandler,
+  	onFocus: MenuEventHandler,	
+}
+
+MenuBar = @record
+{
+	handle: HMENU,
+	font: Font,
+	idNum: integer,
+	menus : hashmap(string, *MenuItem),
+	_menuCount : integer,
+	_menuGrayCref: COLORREF,
+    _menuDefBgBrush : HBRUSH,
+    _menuHotBgBrush : HBRUSH,
+    _menuFrameBrush : HBRUSH,
+    _menuGrayBrush : HBRUSH,
+    _pForm : *Form,
+}
+
+ContextMenu = @record
+{
+	handle: HMENU,
+	font : Font,
+	menus : vector(*MenuItem),
+	parent : pointer,
+	width: integer,
+	height: integer,
+
+	_dummyHwnd: HWND,
+	_selTxtClr : COLORREF,
+	_grayCref : COLORREF,
+	_menuCount: integer,
+	_rightClick: boolean,
+	_defBgBrush: HBRUSH,
+	_hotBgBrush: HBRUSH,
+	_borderBrush: HBRUSH,
+	_grayBrush: HBRUSH,
+
+	onMenuShown : ContextMenuEventHandler,
+	onMenuClose : ContextMenuEventHandler,
+}
+-- =================================================================
+
+global FlatDraw = @record {defBrush: HBRUSH, hotBrush: HBRUSH, defPen: HPEN, hotPen: HPEN} -- Flat color
+global GradDraw = @record {defGC: GradColor, hotGC: GradColor, defPen: HPEN, hotPen: HPEN} -- GradColor is declared in commons
+
+
+global Button = @record
+{
+	name : string,
+	className: LPCWSTR,
+	text : string,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	contextMenu: *ContextMenu,
+	--Privates
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_fdraw: FlatDraw,
+	_gdraw: GradDraw,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+}
+
+## Button.value.is_control = true
+-- =================================================================
+
+global ViewMode = @enum {month = 0, year, decade, centuary}
+
+global WeekDays = @enum {sunday = 0, monday, tuesday, wednesday, thursday, friday, saturday}
+
+global DateTime = @record {
+    year : integer,
+    month: integer,
+    day: integer,
+    hour: integer,
+    minute: integer,
+    second: integer,
+    milliSecond : integer,
+    dayOfWeek : WeekDays,
+}
+
+global Calendar = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    value : DateTime,
+    viewMode : ViewMode,
+    oldView : ViewMode,
+    showWeekNum : boolean,
+    noTodayCircle : boolean,
+    noToday : boolean,
+    noTrailingDates : boolean,
+    shortDayNames : boolean,
+    contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: DWORD,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler,
+	onSelectionChanged: EventHandler,
+	onViewChanged: EventHandler,
+}
+## Calendar.value.is_control = true
+
+function DateTime.fromSystemTime(st: SYSTEMTIME): DateTime
+    local dt : DateTime
+    dt.year = (integer)(st.wYear)
+    dt.month = (integer)(st.wMonth)
+    dt.day = (integer)(st.wDay)
+    dt.hour = (integer)(st.wHour)
+    dt.minute = (integer)(st.wMinute)
+    dt.second = (integer)(st.wSecond)
+    dt.milliSecond = (integer)(st.wMilliseconds)
+    dt.dayOfWeek = (@WeekDays)(st.wDayOfWeek)
+    return dt
+end
+
+-- =================================================================
+
+global CheckBox = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	autoSize: boolean,
+    checked: boolean,
+	rightAlign: boolean,
+	contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: UINT,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+}
+## CheckBox.value.is_control = true
+
+-- =================================================================
+
+global ComboBox = @record
+{
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    items: vector(string),
+    selectedIndex: integer,
+    enableInput: boolean,
+    contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_recreateEnabled: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _oldHwnd: HWND,
+    _dwTxtFlag: UINT,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	onSelectionChanged: EventHandler,
+	onSelectionCommitted: EventHandler,
+	onSelectionCancelled: EventHandler,
+	onGotFocus: EventHandler,
+	onLostFocus: EventHandler,
+	onTextChanged: EventHandler,
+	onTextUpdated: EventHandler,
+	onListOpened: EventHandler,
+	onListClosed: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+}
+## ComboBox.value.is_control = true
+
+-- =================================================================
+
+global DTPFormat = @enum {longDate = 1, shortDate = 2, timeOnly = 4, custom = 8}
+
+global DateTimePicker = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    format: DTPFormat,
+    formatString: string,
+    rightAlign: boolean,
+    fourDigitYear: boolean,
+    value : DateTime,
+    showWeekNum : boolean,
+    noTodayCircle : boolean,
+    noToday : boolean,
+    noTrailingDates : boolean,
+    shortDayNames : boolean,
+    showUpdown : boolean,
+    contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    -- _dwTxtFlag: DWORD,
+    _dropDownCount: integer,
+    _calStyle: DWORD,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler,
+	onCalendarOpened: EventHandler,
+	onCalendarClosed: EventHandler,
+    onTextChanged: DateTimeEventHandler,
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## DateTimePicker.value.is_control = true
+-- =================================================================
+
+global GroupBox = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _pen: HPEN,
+    _txtWidth: integer,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## GroupBox.value.is_control = true
+
+-- =================================================================
+
+global LabelBorder = @enum {noBorder = 0, singleLine, sunkenBorder}
+
+global Label = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	alignment: TextAlign,
+	multiLine: boolean,
+	autoSize: boolean,
+	rightAlign: boolean,
+    border: LabelBorder,
+    contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: DWORD,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## Label.value.is_control = true
+
+-- =================================================================
+
+global ListBox = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	hasSort: boolean,
+    noSelection: boolean,
+	multiColumn: boolean,
+	keyPreview: boolean,
+	useVScroll: boolean,
+	useHScroll: boolean,
+	multiSelection: boolean,
+    selectedIndex: integer,
+	selectedIndices: vector(integer),
+	contextMenu: *ContextMenu,
+	items: vector(string),
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dummyIndex: integer,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	onDoubleClick: EventHandler,
+	onLostFocus: EventHandler,
+	onGotFocus: EventHandler,
+	onSelectionChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## ListBox.value.is_control = true
+
+-- =================================================================
+global ListViewStyle = @enum {LargeIcon = 0, ReportView, SmallIcon, ListView, TileView }
+
+global ListViewColumn = @record {
+	text: string,
+	width: integer,
+	index: integer,
+	imageIndex: integer,
+	imageOnRight: boolean,
+	hasImage: boolean,
+	textAlign: TextAlign,
+	headerTextAlign: TextAlign,	
+	backColor: Color,
+	foreColor: Color,
+	--Private props
+	_drawNeeded: boolean,
+	_isHotItem: boolean,
+	_order: integer,
+	_hdrTxtFlag: DWORD,
+	-- _lvc: *LVCOLUMNW,
+}
+
+
+global ListViewItem = @record {
+	text: string,
+	index: integer,
+	imageIndex: integer,
+	backColor: Color,
+	foreColor: Color,
+	font: Font,
+	subItems: vector(string),
+}
+
+global ListView = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	contextMenu: *ContextMenu,
+
+	--ListView's unique properties
+	selectedIndex: integer,
+	selectdeSubIndex: integer,
+	headerHeight: integer,
+    editLabel: boolean,
+	hideSelection: boolean,
+	multiSelection: boolean,
+	hasCheckBox: boolean,
+	fullRowSelect: boolean,
+	showGrid: boolean,
+	oneClickActivate: boolean,
+	hotTrackSelection: boolean,
+	noHeader: boolean,
+	headerClickable: boolean,
+	checkBoxLast: boolean,
+	checked: boolean,
+	headerBackColor: Color,
+	headerForeColor: Color,
+	headerFont: Font,
+	selectedItem: ListViewItem,
+	viewStyle: ListViewStyle,
+	columns: vector(*ListViewColumn),
+	items: vector(*ListViewItem),
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+	_hdrHotBrush: HBRUSH,
+	_hdrBkBrush: HBRUSH,
+	_hdrPen: HPEN,
+    _colIndex: integer,
+    _rowIndex: integer,
+    _itemIndex: integer,
+    _layoutCount: integer,
+    _hotHdrIndex: integer,
+    _hdrHwnd: HWND,
+    _changeHdrHeight: boolean,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,	
+	onCheckedChanged: EventHandler,
+	onSelectionChanged: EventHandler,
+	onItemDoubleClicked: EventHandler,
+	onItemClicked: EventHandler,
+	onItemHover: EventHandler,
+}
+## ListView.value.is_control = true
+
+-- =================================================================
+global NumberPicker = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+    minRange: number,
+    maxRange: number,
+    textAlign: TextAlign,
+	buttonLeft: boolean,
+    hasSeperator: boolean,
+	autoRotate: boolean,
+	hideCaret: boolean,
+    value: number,
+    step: number,
+    formatString: string,
+    decimalPrecision: integer,
+    trackMouseLeave: boolean, -- Set this true if you want to use mouse enter and/or mouse leave events
+    contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _buddyStyle: DWORD,
+    _buddyExStyle: DWORD,
+    _topEdgeFlag: DWORD,
+    _botEdgeFlag: DWORD,
+    _buddyHwnd: HWND,
+    _buddySCID: UINT_PTR,
+    _buddyRect: RECT,
+    _updRect: RECT,
+    _myRect: RECT,
+    _txtPos: TextAlign,
+    _lineX: integer,
+    _buddyCID: integer,
+    _dwTxtFlag: DWORD,
+    _trackMouseLeave: boolean,
+    _keyPressed: boolean,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,	
+	onValueChanged: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+}
+## NumberPicker.value.is_control = true
+
+-- =================================================================
+
+global ProgressBarState = @enum { none = 0, normal, error, paused }
+global ProgressBarStyle = @enum { block = 0, marquee }
+
+global ProgressBar = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	barState: ProgressBarState,
+    barStyle: ProgressBarStyle,
+    vertical: boolean,
+    showPercentage: boolean,
+    minValue: integer,
+    maxValue: integer,
+    step: integer,
+    value: integer,
+    marqueeSpeed: integer,
+    contextMenu: *ContextMenu,
+        
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler
+	-- onKeyDown: KeyEventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## ProgressBar.value.is_control = true
+
+-- =================================================================
+global RadioButton = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	autoSize: boolean,
+    checked: boolean,
+    checkOnClick: boolean,
+	rightAlign: boolean,
+	contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _dwTxtFlag: UINT,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onCheckedChanged: EventHandler,
+	-- onKeyUp: KeyEventHandler,
+	-- onKeyPress: KeyEventHandler,
+}
+## RadioButton.value.is_control = true
+
+-- =================================================================
+
+global TextCase = @enum {Default = 0, LowerCase, UpperCase}
+global TextType = @enum {Default = 0, NumberOnly, PasswordChar}
+
+global TextBox = @record {
+	name : string,
+	text : string,
+	cueBanner: string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	alignment: TextAlign,
+	textCase: TextCase,
+	textType: TextType,
+	multiLine: boolean,
+	hideSelection: boolean,
+	readOnly: boolean,
+	contextMenu: *ContextMenu,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onTextChanged: EventHandler,
+	onKeyDown: KeyEventHandler,
+	onKeyUp: KeyEventHandler,
+	onKeyPress: KeyEventHandler,
+}
+## TextBox.value.is_control = true
+
+-- =================================================================
+global ChannelStyle = @enum {Classic = 0, Outline }
+global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
+global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
+
+global TicData = @record {
+	phyPoint: integer,
+	logPoint: integer,
+}
+
+global TrackBar = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	contextMenu: *ContextMenu,
+
+	--TrackBar's unique properties
+	vertical: boolean,
+    reversed: boolean,
+	noTics: boolean,
+	selectionRange: boolean,
+	defaultTics: boolean,
+	noThumb: boolean,
+	toolTip: boolean,
+	customDraw: boolean,
+	freeMove: boolean,
+	ticWidth: integer,
+	minRange: integer,
+	maxRange: integer,
+	frequency: integer,
+	pageSize: integer,
+	lineSize: integer,
+	ticLength: integer,
+	value: integer,
+	ticColor: Color,
+	channelColor: Color,
+	selectionColor: Color,
+	channelStyle: ChannelStyle,
+	trackChange: TrackChange,
+	ticPosition: TicPosition,
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+	_selBrush: HBRUSH,
+	_chnPen: HPEN,
+	_ticPen: HPEN,
+    _chnRect: RECT,
+    _thumbRect: RECT,
+    _myRect: RECT,
+    _thumbHalf: integer,
+    _p1: integer,
+    _p2: integer,
+    _ticCount: integer,
+    _chnFlag: DWORD,
+    _ticList: vector(TicData),
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,
+	onValueChanged: EventHandler,
+	onDragging: EventHandler,
+	onDragged: EventHandler,
+}
+## TrackBar.value.is_control = true
+
+-- =================================================================
+global NodeOps = @enum {AddNode = 0, InsertNode, AddChild, InsertChild }
+
+global TreeNode = @record {
+	handle: HTREEITEM,
+	treeHwnd: HWND,
+	parentNode: *TreeNode,
+	imageIndex: integer,
+	selImageIndex: integer,
+	childCount: integer,
+	index: integer,
+	nodeCount: integer,
+	nodeID: integer,
+	checked: boolean,	
+	_isCreated: boolean,
+	foreColor: Color,
+	backColor: Color,
+	text: string,
+	nodes: vector(TreeNode),
+}
+
+global TreeView = @record {
+	name : string,
+	text : string,
+	className: LPCWSTR,
+	handle : HWND,
+	cid: integer,
+	width : integer,
+	height : integer,
+	xpos : integer,
+	ypos : integer,
+	font: Font,
+	parent : *Form,
+	backColor: Color,
+	foreColor: Color,
+	contextMenu: *ContextMenu,
+
+	--TreeView's unique properties
+	lineColor: Color,
+	noLine: boolean,
+    noButton: boolean,
+	hasCheckBox: boolean,
+	fullRowSelect: boolean,
+	isEditable: boolean,
+	showSelection: boolean,
+	hotTrack: boolean,
+	nodeCount: integer,
+	selectedNode: TreeNode,
+	nodes: vector(TreeNode),
+
+	--Private fields
+	_isCreated: boolean,
+	_isTextable: boolean,
+	_style: DWORD,
+	_exStyle: DWORD,
+	_lbDown: boolean,
+	_rbDown: boolean,
+	_isMouseEntered: boolean,
+	_drawFlag: uinteger,
+	_bkBrush: HBRUSH,
+    _uniqNodeID: integer,
+
+	--Events
+	onMouseDown: MouseEventHandler,
+	onMouseUp: MouseEventHandler,
+	onClick: EventHandler,
+	onRightMouseDown: MouseEventHandler,
+	onRightMouseUp: MouseEventHandler,
+	onRightClick: EventHandler,
+	onMouseScroll: MouseEventHandler,
+	onMouseEnter: EventHandler,
+	onMouseMove: MouseEventHandler,
+	onMouseLeave: EventHandler,	
+}
+## TreeView.value.is_control = true
+
+-- ##[[
+-- 	local control_set = {["Button"]=true, ["Calendar"]=true, ["CheckBox"]=true, ["ComboBox"]=true, ["DateTimePicker"]=true, ["GroupBox"]=true, ["Label"]=true, ["ListBox"]=true, ["ListView"]=true, ["NumberPicker"]=true, ["ProgressBar"]=true, ["RadioButton"]=true, ["TextBox"]=true, ["TrackBar"]=true, ["TreeView"]=true}
+
+-- ]]##
+
+-- global Control = #[concept(function(attr)
+-- 	-- print(attr.type.subtype.nickname == "Button", " 1053")
+-- 	local typname = attr.type.subtype.nickname
+-- 	if attr.type.is_pointer and control_set[typname] then return true end
+-- 	return false
+-- end) ]#
+
+
+
+global function testControl(ctl: ControlConcept)
+	print(ctl.text) 
+end
+

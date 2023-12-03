@@ -14,6 +14,7 @@ global Color = @record {
 	ref: COLORREF,
 }
 
+
 local function clip(value: auto): auto
 	return math.clamp(value, 0, 255)
 end
@@ -36,13 +37,6 @@ function Color:updateColor(clr: uinteger)
 	self.ref = (@COLORREF)((self.blue << 16) | (self.green << 8) | self.red)
 end
 
--- function Color:updateColorEx(clr: Color)
--- 	self.value = clr
--- 	self.red = clr.red
--- 	self.green = clr.green
--- 	self.blue = clr.blue
--- 	self.ref = clr.ref
--- end
 function Color.fromRGB(r: uinteger, g: uinteger, b: uinteger): Color
 	local this: Color
 	this.value = (r << 16) | (g << 8) | b
@@ -70,6 +64,17 @@ function Color:getHotBrush(adj: number): HBRUSH
 	local cclr = self:changeColor(adj)
 	return CreateSolidBrush(cclr.ref)
 end
+
+function Color.getHBrush(clr: uinteger): HBRUSH
+	local this = Color.new(clr)
+	return CreateSolidBrush(this.ref)
+end
+
+function Color.getColorRef(clr: uinteger): COLORREF
+	local this = Color.new(clr)
+	return this.ref
+end
+
 
 function Color:getHotColor(adj: number): Color
 	local r = clip((@uinteger)(self.red * adj))

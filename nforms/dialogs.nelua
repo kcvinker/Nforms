@@ -1,0 +1,215 @@
+-- Created on 27-Nov-2023 09:50 PM
+
+-- require "nforms.api_messages"
+require "nforms.apifuncs"
+require "nforms.common"
+require 'span'
+
+-- Constants
+	local MAX_PATH : DWORD <comptime> = 260
+    local MAX_ARR_SIZE : DWORD <comptime> = 32768 + 256 * 100 + 1
+    local OFN_ALLOWMULTISELECT : DWORD <comptime> = 0x200
+    local OFN_PATHMUSTEXIST : DWORD <comptime> = 0x800
+    local OFN_FILEMUSTEXIST : DWORD <comptime> = 0x1000
+    local OFN_FORCESHOWHIDDEN : DWORD <comptime> = 0x10000000
+    local OFN_OVERWRITEPROMPT : DWORD <comptime> = 0x2
+    local BIF_RETURNONLYFSDIRS : DWORD <comptime> = 0x00000001
+    local BIF_NEWDIALOGSTYLE : DWORD <comptime> = 0x00000040
+    local BIF_EDITBOX : DWORD <comptime> = 0x00000010
+    local BIF_NONEWFOLDERBUTTON : DWORD <comptime> = 0x00000200
+    local BIF_BROWSEINCLUDEFILES : DWORD <comptime> = 0x00004000
+    local OFN_EXPLORER : DWORD <comptime> = 0x00080000
+--
+
+global FileOpenDialog = @record {
+	title: string,
+	initDir: string,
+	filter: string,
+	selectedPath: string,
+	fileStart: integer,
+	extStart: integer,
+	allowAllFiles: boolean,
+	multiSelection: boolean,
+	showHidden: boolean,
+	_descr: string,
+	selectedFiles: vector(string)
+}
+
+
+global FileSaveDialog = @record {
+	title: string,
+	initDir: string,
+	filter: string,
+	selectedPath: string,
+	fileStart: integer,
+	extStart: integer,
+	allowAllFiles: boolean,
+	defExt: string,
+	_descr: string,
+}
+
+global FolderBrowserDialog = @record {
+	title: string,
+	initDir: string,
+	filter: string,
+	selectedPath: string,
+	newFolBtn: boolean,
+	showFiles: boolean
+}
+
+
+
+global DialogParams = @record {
+	title: string, 
+	initFolder: string,
+	filter: string,
+	description: string,
+}
+
+function FileOpenDialog.new(params: DialogParams): FileOpenDialog
+	local this : FileOpenDialog
+	this.title = params.title
+	this.initDir = params.initFolder
+	this.filter = params.filter
+	this._descr = params.description == "" and "All Files" or params.description
+	if params.filter == "" then
+		this.filter = string.format("%s\0*.*\0\0", this._descr)
+	else
+		this.filter = string.format("%s\0*%s\0\0", this._descr, params.filter)
+	end
+	return this
+end
+
+function FileOpenDialog:setFilters(description: string, ...: varargs)
+	local extensions : vector(string)
+	local newFilter = string.format("%s\0", description)
+
+	## for i=1,select('#', ...) do
+		extensions:push(#[select(i, ...)]#)		
+	## end
+	local length = extensions.sized
+	for i, ext in ipairs(extensions) do
+		if i == (length - 1) then
+			newFilter = string.format("%s*%s\0\0", newFilter, ext)
+		else
+			newFilter = string.format("%s*%s;", newFilter, ext)
+		end
+	end
+	self.filter = newFilter
+end
+
+function FileOpenDialog:_extractFileNames(buffer: span(WCHAR), stpos: WORD)
+	local startpos : integer = (@integer)(stpos)
+	local dirPath = wchars_to_utf8(buffer:sub(0, stpos - 1))
+	print(dirPath)
+	for i = startpos, <MAX_ARR_SIZE do
+		local wchar = buffer[i]
+		if wchar == 0 then
+			local slice = buffer:sub(startpos, i)
+			startpos = i + 1
+			local fullpath = string.format("%s\\%s", dirPath, wchars_to_utf8(slice))
+			self.selectedFiles:push(fullpath)
+			if buffer[startpos] == 0 then break end
+		end
+	end
+end	
+
+
+function FileOpenDialog:showDialog(hwnd: HWND): boolean
+	local fileBuffer : [MAX_ARR_SIZE]WCHAR
+	local ofn : OPENFILENAMEW
+	
+	ofn.hwndOwner = hwnd
+    ofn.lStructSize = #OPENFILENAMEW
+    ofn.lpstrFilter = toUTF16(self.filter)
+    ofn.lpstrFile = &fileBuffer[0]
+    ofn.lpstrInitialDir = #self.initDir == 0 and nilptr or toUTF16(self.initDir)
+    ofn.lpstrTitle = toUTF16(self.title)
+    ofn.nMaxFile = MAX_ARR_SIZE
+    ofn.nMaxFileTitle = MAX_PATH
+    -- ofn.lpstrDefExt = (0, ^WCHAR)
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST
+	if self.multiSelection then ofn.Flags = ofn.Flags | OFN_ALLOWMULTISELECT | OFN_EXPLORER end
+	if self.showHidden then ofn.Flags = ofn.Flags | OFN_FORCESHOWHIDDEN end
+	local ret = GetOpenFileNameW(&ofn)
+	if ret > 0 then
+	    if self.multiSelection then
+	        self:_extractFileNames(fileBuffer, ofn.nFileOffset)
+	        return true
+	     else
+	        self.selectedPath = wchars_to_utf8(fileBuffer)
+	        return true
+	    end	
+	end	
+	return false
+end
+
+
+--==================================================================================================
+function FileSaveDialog.new(params: DialogParams): FileSaveDialog
+	local this : FileSaveDialog
+	this.title = params.title
+	this.initDir = params.initFolder
+	this.filter = params.filter
+	this._descr = params.description == "" and "All Files" or params.description
+	if params.filter == "" then
+		this.filter = string.format("%s\0*.*\0\0", this._descr)
+	else
+		this.filter = string.format("%s\0*%s\0\0", this._descr, params.filter)
+	end
+	return this
+end
+
+function FileSaveDialog:showDialog(hwnd: HWND): boolean
+	local fileBuffer : [MAX_PATH]WCHAR
+	local ofn : OPENFILENAMEW
+	ofn.hwndOwner = hwnd
+    ofn.lStructSize = #OPENFILENAMEW
+    ofn.lpstrFilter = toUTF16(self.filter)
+    ofn.lpstrFile = &fileBuffer[0]
+    ofn.lpstrInitialDir = #self.initDir == 0 and nilptr or toUTF16(self.initDir)
+    ofn.lpstrTitle = toUTF16(self.title)
+    ofn.nMaxFile = MAX_ARR_SIZE
+    ofn.nMaxFileTitle = MAX_PATH
+    -- ofn.lpstrDefExt = (0, ^WCHAR)
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT	
+	local ret = GetSaveFileNameW(&ofn)
+	if ret > 0 then	    
+	    self.selectedPath = wchars_to_utf8(fileBuffer)
+	    self.fileStart = (@integer)(ofn.nFileOffset)
+        self.extStart = (@integer)(ofn.nFileExtension)
+	    return true	    	
+	end	
+	return false
+end
+
+-- ==================================================================================================
+
+function FolderBrowserDialog.new(params: DialogParams): FolderBrowserDialog
+	local this : FolderBrowserDialog
+	this.title = params.title
+	this.initDir = params.initFolder	
+	return this
+end
+
+function FolderBrowserDialog:showDialog(hwnd: HWND): boolean
+	local buffer : [MAX_PATH]WCHAR
+    local bi : BROWSEINFOW
+    bi.hwndOwner = hwnd
+    bi.lpszTitle = toUTF16(self.title)
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE
+    if self.newFolBtn then bi.ulFlags = bi.ulFlags | BIF_NONEWFOLDERBUTTON end
+    if self.showFiles then bi.ulFlags = bi.ulFlags | BIF_BROWSEINCLUDEFILES end
+    local pidl : LPITEMIDLIST = SHBrowseForFolderW(&bi)
+    if pidl ~= nil then
+        local res = SHGetPathFromIDListW(pidl, &buffer[0])
+        if res ~= 0 then
+            CoTaskMemFree(pidl)
+            self.selectedPath = wchars_to_utf8(buffer)
+            return true
+        else
+            CoTaskMemFree(pidl)
+        end
+    end
+    return false
+end

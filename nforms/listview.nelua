@@ -3,8 +3,9 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
+require "io"
 
 --Constants
 	local LVM_FIRST <comptime> = 4096
@@ -72,111 +73,7 @@ local lvClass = toUTF16("SysListView32")
 local function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 local function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global ListViewStyle = @enum {LargeIcon = 0, ReportView, SmallIcon, ListView, TileView }
 
-global ListViewColumn = @record {
-	text: string,
-	width: integer,
-	index: integer,
-	imageIndex: integer,
-	imageOnRight: boolean,
-	hasImage: boolean,
-	textAlign: TextAlign,
-	headerTextAlign: TextAlign,	
-	backColor: Color,
-	foreColor: Color,
-	--Private props
-	_drawNeeded: boolean,
-	_isHotItem: boolean,
-	_order: integer,
-	_hdrTxtFlag: DWORD,
-	-- _lvc: *LVCOLUMNW,
-}
-
-global ListViewItem = @record {
-	text: string,
-	index: integer,
-	imageIndex: integer,
-	backColor: Color,
-	foreColor: Color,
-	font: Font,
-	subItems: vector(string),
-}
-
-global ListView = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-	--ListView's unique properties
-	selectedIndex: integer,
-	selectdeSubIndex: integer,
-	headerHeight: integer,
-    editLabel: boolean,
-	hideSelection: boolean,
-	multiSelection: boolean,
-	hasCheckBox: boolean,
-	fullRowSelect: boolean,
-	showGrid: boolean,
-	oneClickActivate: boolean,
-	hotTrackSelection: boolean,
-	noHeader: boolean,
-	headerClickable: boolean,
-	checkBoxLast: boolean,
-	checked: boolean,
-	headerBackColor: Color,
-	headerForeColor: Color,
-	headerFont: Font,
-	selectedItem: ListViewItem,
-	viewStyle: ListViewStyle,
-	columns: vector(*ListViewColumn),
-	items: vector(*ListViewItem),
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-	_hdrHotBrush: HBRUSH,
-	_hdrBkBrush: HBRUSH,
-	_hdrPen: HPEN,
-    _colIndex: integer,
-    _rowIndex: integer,
-    _itemIndex: integer,
-    _layoutCount: integer,
-    _hotHdrIndex: integer,
-    _hdrHwnd: HWND,
-    _changeHdrHeight: boolean,
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,	
-	onCheckedChanged: EventHandler,
-	onSelectionChanged: EventHandler,
-	onItemDoubleClicked: EventHandler,
-	onItemClicked: EventHandler,
-	onItemHover: EventHandler,
-}
 
 function ListView:createHandle() <forwarddecl> end
 global ListViewParams = @record
@@ -207,7 +104,8 @@ function ListView.new(params: ListViewParams) : *ListView
 	this.hideSelection = true
 	this.oneClickActivate = true
 	this.headerClickable = true
-	this.headerHeight = 35
+	this.headerHeight = 0
+	this._changeHdrHeight = false
 	this._itemIndex = -1
 	this._hotHdrIndex = -1
 	this.headerBackColor = Color.new(0xdce1de) 
@@ -272,7 +170,7 @@ end
 
 	function ListView:setHeaderSubclass()
 		self._hdrHwnd = (@HWND)(SendMessageW(self.handle, LVM_GETHEADER, 0, 0))
-		SetWindowSubclass(self._hdrHwnd, &hdrWndProc, subClassID, (@DWORD_PTR)(&self))
+		SetWindowSubclass(self._hdrHwnd, &hdrWndProc, subClassID, (@DWORD_PTR)((@pointer)(self)))
 		subClassID = subClassID + 1
 	end
 
@@ -295,6 +193,7 @@ end
 -- Public function
 function ListView:createHandle()
 	self:setLVStyle()
+	if self.headerHeight > 0 then self._changeHdrHeight = true end
 	createControl(self)
 	if self._isCreated then
 		self:setLVExStyles()
@@ -304,20 +203,26 @@ function ListView:createHandle()
 	end
 end
 
+function ListView:setHeaderHeight(height: integer)
+	self.headerHeight = height
+	self._changeHdrHeight = true
+	suddenRedraw(self)
+end
+
 --Private function
 function ListView:addColumnInternal(lvCol: *ListViewColumn)
 	lvCol.index = self._colIndex 
     local lvc: LVCOLUMNW
-    lvc.mask = LVCF_FMT | LVCF_TEXT  | LVCF_WIDTH  | LVCF_SUBITEM --| LVCF_ORDER
+    lvc.mask = LVCF_FMT | LVCF_TEXT  | LVCF_WIDTH  | LVCF_SUBITEM
     lvc.fmt = lvCol.textAlign
     lvc.cx = lvCol.width
     lvc.pszText = toUTF16(lvCol.text)
     if lvCol.hasImage then
         lvc.mask = lvc.mask | LVCF_IMAGE
         lvc.fmt = lvc.fmt | LVCFMT_COL_HAS_IMAGES | LVCFMT_IMAGE
-        lvc.iImage = lvCol.imageIndex
-        if lvCol.imageOnRight then lvc.fmt = lvc.fmt | LVCFMT_BITMAP_ON_RIGHT end
+        lvc.iImage = lvCol.imageIndex        
     end
+    if lvCol.imageOnRight then lvc.fmt = lvc.fmt | LVCFMT_BITMAP_ON_RIGHT end
     -- lvCol._lvc = &lvc
     if self._isCreated then
         SendMessageW(self.handle, LVM_INSERTCOLUMNW, lvCol.index, (@LPARAM)(&lvc))
@@ -361,22 +266,23 @@ function ListView:addColumnsEx(...: varargs)
 end
 
 --Private function
-function ListView:addItemInternal(item: *ListViewItem)
-	item.index = self._rowIndex
-	local lvi: LVITEMW
-    lvi.mask =  LVIF_TEXT | LVIF_PARAM | LVIF_STATE
-    if item.imageIndex ~= -1 then lvi.mask = lvi.mask | LVIF_IMAGE end
-    lvi.state = 0
-    lvi.stateMask = 0
-    lvi.iItem = item.index
-    lvi.iSubItem = 0
-    lvi.iImage = item.imageIndex
-    lvi.pszText = toUTF16(item.text)
-    lvi.cchTextMax = #item.text
-    lvi.lParam = (@LPARAM)((@pointer)(item))
-    local x = SendMessageW(self.handle, LVM_INSERTITEMW, 0, (@LPARAM)(&lvi))
-    self.items:push(item)
+function ListView:addItemInternal(lvi: *ListViewItem)
+	lvi.index = self._rowIndex
+	local item: LVITEMW
+    item.mask =  LVIF_TEXT | LVIF_PARAM | LVIF_STATE
+    if lvi.imageIndex > -1 then item.mask = item.mask | LVIF_IMAGE end
+    item.state = 0
+    item.stateMask = 0
+    item.iItem = self._rowIndex
+    item.iSubItem = 0
+    item.iImage = lvi.imageIndex
+    item.pszText = toUTF16(lvi.text)
+    item.cchTextMax = (@cint)(#lvi.text)
+    item.lParam = (@LPARAM)((@pointer)(lvi))
+    local x = SendMessageW(self.handle, LVM_INSERTITEMW, 0, (@LPARAM)(&item))
+    self.items:push(lvi)
     self._rowIndex = self._rowIndex + 1
+    -- print(string.format("insert res : %d", x))
 end
 
 --Private function
@@ -390,31 +296,31 @@ function ListView:addSubItemInternal(sItem: string, itemIndex: integer, subIndx:
     self.items[itemIndex].subItems:push(sItem)
 end
 
-function ListView:addRow(... : varargs)
-	local args : vector(string)
-	## for i=1,select('#', ...) do
-		## local argnode = select(i, ...)
-    -- 	## local argtype = argnode.attr.type
-    -- 	## if argtype.is_string then 
-    		args:push(tostring(#[argnode]#))
-    -- 	## else
-    -- 		args:push(tostring(#[argnode]#))
-    	-- ## end
+-- function ListView:addRow(... : varargs)
+-- 	local args : vector(string)
+-- 	## for i=1,select('#', ...) do
+-- 		## local argnode = select(i, ...)
+--     -- 	## local argtype = argnode.attr.type
+--     -- 	## if argtype.is_string then 
+--     		args:push(tostring(#[argnode]#))
+--     -- 	## else
+--     -- 		args:push(tostring(#[argnode]#))
+--     	-- ## end
     	
-	## end
+-- 	## end
 	
-	local lvitem = ListViewItem.new(args[0])
-	self:addItemInternal(lvitem)	
-	for i = 1,<#args do
-		self:addSubItemInternal(args[i], lvitem.index, i, -1)
-	end
-end
+-- 	local lvitem = ListViewItem.new(args[0])
+-- 	self:addItemInternal(lvitem)	
+-- 	for i = 1,<#args do
+-- 		self:addSubItemInternal(args[i], lvitem.index, i, -1)
+-- 	end
+-- end
 
-function ListView:addRowEx(items: span(string))
+function ListView:addRow(items: span(string))
 	local lvitem = ListViewItem.new(items[0])
 	self:addItemInternal(lvitem)	
-	for i = 1,<#items do
-		self:addSubItemInternal(items[i], lvitem.index, i, -1)
+	for i, item in ipairs(items) do
+		self:addSubItemInternal(item, lvitem.index, i, -1)
 	end
 end
 
@@ -433,41 +339,59 @@ function ListView:addSubItem(subitem: auto, itemIndex: integer, subIndex: intege
 	self:addSubItemInternal(sItem, itemIndex, subIndex, -1)
 end
 
+function ListView:addContextMenu(items: span(string))
+	self.contextMenu = ContextMenu.new(self)
+	self.contextMenu:addItems(items)
+end
+
 --Private function
 function ListView:headerCustomDraw(nmcd: LPNMCUSTOMDRAW): LRESULT
-	local col = self.columns[nmcd.dwItemSpec]
-    SetBkMode(nmcd.hdc, 1)
-    if col.index > 0 then nmcd.rc.left = nmcd.rc.left + 1 end
-    if self.headerClickable then
-        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
-            -- Header is clicked. So we will change the back color.
-            FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
-        else
-            if nmcd.dwItemSpec == self._hotHdrIndex then
-                -- Mouse pointer is on header. So we will change the back color.
-                FillRect(nmcd.hdc, &nmcd.rc, self._hdrHotBrush)
-            else
-                FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
-            end
-        end
-        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
-            -- Here we are mimicing dot net's same technique.
-            -- We will change the rect's left and top a little bit when header got clicked.
-            -- So user will feel the header is pressed. */
-            nmcd.rc.left = nmcd.rc.left + 2
-            nmcd.rc.top = nmcd.rc.top + 2
-        end
-    else
-        FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
-    end
-    -- Draw a white line on ther right side of the hdr
-    SelectObject(nmcd.hdc, self._hdrPen)
-    MoveToEx(nmcd.hdc, nmcd.rc.right, nmcd.rc.top, nilptr)
-    LineTo(nmcd.hdc, nmcd.rc.right, nmcd.rc.bottom)
-    SelectObject(nmcd.hdc, self.headerFont.handle)
-    SetTextColor(nmcd.hdc, self.headerForeColor.ref)
-    DrawTextW(nmcd.hdc, toUTF16(col.text), -1, &nmcd.rc, col._hdrTxtFlag)
-    return CDRF_SKIPDEFAULT
+	-- print(string.format("nmcd size %d", #NMCUSTOMDRAW))
+	if #self.columns > 0 then
+		local hd_index = (@cint)(nmcd.dwItemSpec)
+		local col = self.columns[hd_index]
+	    -- if nmcd.rc.bottom > 100 then nmcd.rc.bottom = 24 end
+	    if col.index > 0 then nmcd.rc.left = nmcd.rc.left + 1 end
+	    if self.headerClickable then
+	        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
+	            -- Header is clicked. So we will change the back color.
+	            FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+	        else
+	            if hd_index == self._hotHdrIndex then
+	                -- Mouse pointer is on header. So we will change the back color.
+	                FillRect(nmcd.hdc, &nmcd.rc, self._hdrHotBrush)
+	            else
+	            	-- Default header draw	            	
+	                FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+	            end
+	        end
+	        if (nmcd.uItemState & CDIS_SELECTED) == CDIS_SELECTED then
+	            -- Here we are mimicing dot net's same technique.
+	            -- We will change the rect's left and top a little bit when header got clicked.
+	            -- So user will feel the header is pressed. */
+	            nmcd.rc.left = nmcd.rc.left + 2
+	            nmcd.rc.top = nmcd.rc.top + 2
+	        end
+	    else
+
+	        FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+	    end
+
+	    -- Draw a white line on ther right side of the hdr
+	    SelectObject(nmcd.hdc, self._hdrPen)
+	    MoveToEx(nmcd.hdc, nmcd.rc.right, nmcd.rc.top, nilptr)
+	    LineTo(nmcd.hdc, nmcd.rc.right, nmcd.rc.bottom)
+
+	    SetBkMode(nmcd.hdc, 1)
+	    nmcd.rc.left = nmcd.rc.left + 3
+	    SelectObject(nmcd.hdc, self.headerFont.handle)
+	    SetTextColor(nmcd.hdc, self.headerForeColor.ref)
+	    DrawTextW(nmcd.hdc, toUTF16(col.text), -1, &nmcd.rc, col._hdrTxtFlag)
+	    return CDRF_SKIPDEFAULT
+	else
+		FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)
+	end
+	return CDRF_DODEFAULT
 end
 
 --Private function
@@ -560,7 +484,12 @@ function lvWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	                    return this:headerCustomDraw(nmcd)
                 end
         end
+	
+    case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
 	end
+
+	
 	return DefSubclassProc(hw, msg, wpm, lpm)
 end
 
@@ -579,17 +508,19 @@ function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
         local hinfo: HDHITTESTINFO
         hinfo.pt = getMousePos(lpm)
         this._hotHdrIndex = (@integer)(SendMessageW(hw, HDM_HITTEST, 0, (@LPARAM)(&hinfo)))
+
     case WM_MOUSELEAVE then this._hotHdrIndex = -1
+
    	case HDM_LAYOUT then
-   		if this._changeHdrHeight then
+   		if this._changeHdrHeight then   			
             local pHl = (@LPHDLAYOUT)(lpm)
             pHl.pwpos.hwnd = hw
             pHl.pwpos.flags = SWP_FRAMECHANGED
-            pHl.pwpos.x = pHl.prc.left
+            pHl.pwpos.x = (@int32)(pHl.prc.left)
             pHl.pwpos.y = 0
-            pHl.pwpos.cx = (pHl.prc.right - pHl.prc.left)
-            pHl.pwpos.cy = this.headerHeight
-            pHl.prc.top = this.headerHeight
+            pHl.pwpos.cx = (@int32)(pHl.prc.right - pHl.prc.left)
+            pHl.pwpos.cy = (@int32)(this.headerHeight)
+            pHl.prc.top = (@LONG)(this.headerHeight)
             return 1
         end
 	case WM_PAINT then
@@ -598,6 +529,7 @@ function hdrWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PT
         -- we are using white color for header. */
         -- First, let the control to do it's necessary drawings.
         DefSubclassProc(hw, msg, wpm, lpm)
+
         -- Now, we can draw the last part of the header.
         local hrc: RECT
         SendMessageW(hw, HDM_GETITEMRECT, #this.columns - 1, (@LPARAM)(&hrc))

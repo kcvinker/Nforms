@@ -3,7 +3,7 @@
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
-require "nforms.forms"
+require "nforms.controls"
 require "nforms.common"
 
 --Constants
@@ -87,90 +87,7 @@ local tkNumber = 1
 local tkbClass = toUTF16("msctls_trackbar32")
 local function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
 
-global ChannelStyle = @enum {Classic = 0, Outline }
-global TrackChange = @enum {None = 0, ArrowLow, ArrowHigh, PageLow, PageHigh, MouseClick, MouseDrag }
-global TicPosition = @enum {DownSide = 0, UpSide, LeftSide, RightSide, BothSide }
 
-global TicData = @record {
-	phyPoint: integer,
-	logPoint: integer,
-}
-
-global TrackBar = @record {
-	name : string,
-	text : string,
-	className: LPCWSTR,
-	handle : HWND,
-	cid: integer,
-	width : integer,
-	height : integer,
-	xpos : integer,
-	ypos : integer,
-	font: Font,
-	parent : *Form,
-	backColor: Color,
-	foreColor: Color,
-	--TrackBar's unique properties
-	vertical: boolean,
-    reversed: boolean,
-	noTics: boolean,
-	selectionRange: boolean,
-	defaultTics: boolean,
-	noThumb: boolean,
-	toolTip: boolean,
-	customDraw: boolean,
-	freeMove: boolean,
-	ticWidth: integer,
-	minRange: integer,
-	maxRange: integer,
-	frequency: integer,
-	pageSize: integer,
-	lineSize: integer,
-	ticLength: integer,
-	value: integer,
-	ticColor: Color,
-	channelColor: Color,
-	selectionColor: Color,
-	channelStyle: ChannelStyle,
-	trackChange: TrackChange,
-	ticPosition: TicPosition,
-	--Private fields
-	_isCreated: boolean,
-	_isTextable: boolean,
-	_style: DWORD,
-	_exStyle: DWORD,
-	_lbDown: boolean,
-	_rbDown: boolean,
-	_isMouseEntered: boolean,
-	_drawFlag: uinteger,
-	_bkBrush: HBRUSH,
-	_selBrush: HBRUSH,
-	_chnPen: HPEN,
-	_ticPen: HPEN,
-    _chnRect: RECT,
-    _thumbRect: RECT,
-    _myRect: RECT,
-    _thumbHalf: integer,
-    _p1: integer,
-    _p2: integer,
-    _ticCount: integer,
-    _chnFlag: DWORD,
-    _ticList: vector(TicData),
-	--Events
-	onMouseDown: MouseEventHandler,
-	onMouseUp: MouseEventHandler,
-	onClick: EventHandler,
-	onRightMouseDown: MouseEventHandler,
-	onRightMouseUp: MouseEventHandler,
-	onRightClick: EventHandler,
-	onMouseScroll: MouseEventHandler,
-	onMouseEnter: EventHandler,
-	onMouseMove: MouseEventHandler,
-	onMouseLeave: EventHandler,
-	onValueChanged: EventHandler,
-	onDragging: EventHandler,
-	onDragged: EventHandler,
-}
 
 -- function TrackBar:createHandle() <forwarddecl> end
 global TrackBarParams = @record
@@ -354,6 +271,11 @@ end
 		end
 	end
 
+	function TrackBar:addContextMenu(items: span(string))
+		self.contextMenu = ContextMenu.new(self)
+		self.contextMenu:addItems(items)
+	end
+
 -- End public function
 
 --Private function
@@ -455,6 +377,8 @@ end
 	    return result
 	end
 
+
+
 	--Private function
 	function TrackBar:destroy()
 		DeleteObject(self._bkBrush)
@@ -484,6 +408,8 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
 	case WM_MOUSEMOVE then mouseMoveHandler(this, msg, wpm, lpm)
 	case WM_MOUSELEAVE then mouseLeaveHandler(this)
 	case MM_LABEL_COLOR then return (@LRESULT)(this._bkBrush)
+	case WM_CONTEXTMENU then
+		if this.contextMenu ~= nilptr then this.contextMenu:show(lpm) end
 
 	case MM_HSCROLL, MM_VSCROLL then
 		local lwp = loWord(wpm)
@@ -595,6 +521,7 @@ function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR
             else
             	return CDRF_DODEFAULT
             end
+
         case 4294967280 then -- con.TRBN_THUMBPOSCHANGING:
             this.trackChange = TrackChange.MouseClick
         end
