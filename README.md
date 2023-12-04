@@ -3,7 +3,7 @@
 ## A simple GUI library for Nelua programming language. Based on Windows API
 
 ## Screenshots
-![image](Screenshot_327.jpg)
+![image](nforms-0412.jpg)
 
 
 ## Code for the above screenshot
@@ -14,7 +14,11 @@ require "nforms"
 local frm = Form.new("NForms GUI Library Window", 800, 550)
 frm:createHandle()
 
-
+local mbr = frm:addMenuBar({"File", "Edit", "Format"})
+mbr.menus["File"]:addItems({"Windows", "Linux", "|", "ReactOS"}) -- Pipe symbol is for separator
+mbr.menus["Edit"]:addItems({"Cut", "Copy", "Paste"})
+mbr.menus["Format"]:addItems({"Font", "Line Space", "Paragraph"})
+mbr.menus["File"].menus["Windows"]:addItems({"Win7", "Win8", "Win10", "Win11"})
 
 local b1 = Button.new{frm, "Normal Btn", create = true}
 local b2 = Button.new{frm, "Flat Color", xpos = right(b1, 10), 10, create = true}

@@ -25,6 +25,7 @@ require "nforms.font"
 require "nforms.common"
 require "nforms.controls"
 require "hashmap"
+require "io"
 
 
 
@@ -128,6 +129,7 @@ local function windowProc(hw : HWND, msg: cuint, wp: WPARAM, lp: LPARAM): LRESUL
 local function regWindow() <forwarddecl> end
 function ContextMenu:show(lpm: LPARAM) <forwarddecl> end
 function MenuBar:createHandle() <forwarddecl> end
+function MenuItem:getChildMenuFromID(idnum: UINT) : (boolean, *MenuItem) <forwarddecl> end
 
 -- local function getChildControl(ctl: pointer, ctype: ControlType) : auto <forwarddecl> end
 -- global MenuClickHandler: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
@@ -343,13 +345,22 @@ function Form:setBKGInternal(wpm: WPARAM) : LRESULT
 end
 
 --Private function
-	function Form:getMenuItem(menuId: UINT): *MenuItem
+	function Form:getMenuFromID(menuId: UINT): (boolean, *MenuItem)
 		if #self._menuList > 0 then
 			for _,menu in ipairs(self._menuList) do
-				if menu.menuID == menuId then return menu end
+				if menu.menuID == menuId then return true, menu end
 			end
 		end
-		return nilptr
+		return false, nilptr
+	end
+
+	function Form:getMenuFromHmenu(hmenu: HMENU): (boolean, *MenuItem)
+	    if #self._menuList > 0 then
+	        for _, menu in ipairs(self._menuList) do
+	            if menu.handle == hmenu then return true, menu end
+	        end
+	    end
+	    return false, nilptr
 	end
 
 	local function trackMouse(hw: HWND)
@@ -598,12 +609,12 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 	case WM_COMMAND then
 		switch hiWord(wpm) do
 		case 0 then -- from menu
-			local menu = this:getMenuItem((@UINT)(loWord(wpm)))
-			if menu ~= nilptr then
+			local menu_okay, menu = this:getMenuFromID((@UINT)(loWord(wpm)))
+			if menu_okay then
 				local ea : EventArgs = {}
 				menu.onClick(menu, &ea)
 			end
-		case 1 then -- accelerator keys
+		-- case 1 then -- accelerator keys
 		case 2 then
 			local ctHwnd = (@HWND)(lpm)
 			return SendMessageW(ctHwnd, MM_CTL_COMMAND, wpm, lpm)
@@ -640,10 +651,39 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 		else
 			return SendMessageW(ctHwnd, MM_LIST_COLOR, wpm, lpm)
 		end
-	case MM_MENU_EVENT then -- When user sets a click event handler for a menu item.
-		this._menuList:push((@*MenuItem)((@pointer)(lpm)))
-	-- case WM_PARENTNOTIFY then
-	-- 	print("parent notify")
+
+	case WM_MENUSELECT then
+        local menu_okay, pmenu = this:getMenuFromHmenu((@HMENU)(lpm))
+       	local mid = (@UINT)(loWord(wpm)) -- Could be an id of a child menu or index of a child menu
+        local hwwpm = hiWord(wpm)
+        if menu_okay then
+        	menu_okay = false      	
+            local menu : *MenuItem
+            switch hwwpm do
+            case 33152 then -- A normal child menu. We can use mid ad menu id.
+                menu_okay, menu = this:getMenuFromID(mid)
+            case 33168 then -- A popup child menu. We can use mid as index.
+                menu_okay, menu = pmenu:getChildMenuFromID(mid)
+        	end
+            if menu_okay and menu.onFocus ~= nilptr then
+                local ea : EventArgs = {}
+                menu.onFocus(menu, &ea)
+            end
+        end
+
+    case WM_INITMENUPOPUP then
+        local menu_okay, menu = this:getMenuFromHmenu((@HMENU)(wpm))
+        if menu_okay and menu.onPopup ~= nilptr then
+            local ea : EventArgs = {}
+           	menu.onPopup(menu, &ea)
+        end
+
+    case WM_UNINITMENUPOPUP then
+        local menu_okay, menu = this:getMenuFromHmenu((@HMENU)(wpm))
+        if menu_okay and menu.onCloseup ~= nilptr then
+            local ea : EventArgs = {}
+            menu.onCloseup(menu, &ea)
+        end	
 	end
 
 
@@ -718,9 +758,10 @@ end
 
 	--Private function
 	function MenuItem:changeType()
-		if self.kind == MenuType.BaseMenu or self.kind == MenuType.NormalMenu then
+		if self.kind == MenuType.NormalMenu then
 			self.kind = MenuType.DropDownMenu
 		end
+		self._popup = true
 	end
 
 	function MenuBar:addItem(menuTxt: string): *MenuItem
@@ -734,7 +775,7 @@ end
 	end
 
 	function MenuItem:addItem(txt: string): *MenuItem
-		-- self:changeType()
+		self:changeType()
 		self._popup = true
 		local mi: *MenuItem = MenuItem.new(txt, MenuType.NormalMenu, self.handle, self._menuCount)
 		mi._formHwnd = self._formHwnd
@@ -747,7 +788,7 @@ end
 	end
 
 	function MenuItem:addItems(menuitems: span(string))
-		-- self:changeType()	
+		self:changeType()	
 		for _, sitem in ipairs(menuitems) do
 			local typ : MenuType = sitem == "|" and MenuType.Separator or MenuType.NormalMenu
 			-- if typ == MenuType.Seperator then sitem = nil end
@@ -815,6 +856,15 @@ end
 		local mbar = MenuBar.new(self, items)
 		self.menubar = mbar
 		return mbar
+	end
+
+	function MenuItem:getChildMenuFromID(idnum: UINT) : (boolean, *MenuItem)
+	    if self._menuCount > 0 then
+	        for _, menu in pairs(self.menus) do
+	            if menu.idNum == idnum then return true, menu end
+	        end
+	    end
+	    return false, nilptr
 	end
 -- End of MenuBar related code
 
@@ -920,7 +970,7 @@ end
 		local cmenu = (@*ContextMenu)((pointer)(refData))
 		switch msg do
 		case WM_DESTROY then 
-			print("cmenu destroyed")
+			-- print("cmenu destroyed")
 			DestroyMenu(cmenu.handle)
 			RemoveWindowSubclass(hw, cmenuWndProc, scID)
 
