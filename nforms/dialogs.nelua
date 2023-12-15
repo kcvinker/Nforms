@@ -87,7 +87,7 @@ function FileOpenDialog:setFilters(description: string, ...: varargs)
 	## for i=1,select('#', ...) do
 		extensions:push(#[select(i, ...)]#)		
 	## end
-	local length = extensions.sized
+	local length = extensions.size
 	for i, ext in ipairs(extensions) do
 		if i == (length - 1) then
 			newFilter = string.format("%s*%s\0\0", newFilter, ext)
@@ -169,7 +169,7 @@ function FileSaveDialog:showDialog(hwnd: HWND): boolean
     ofn.lpstrFile = &fileBuffer[0]
     ofn.lpstrInitialDir = #self.initDir == 0 and nilptr or toUTF16(self.initDir)
     ofn.lpstrTitle = toUTF16(self.title)
-    ofn.nMaxFile = MAX_ARR_SIZE
+    ofn.nMaxFile = MAX_PATH
     ofn.nMaxFileTitle = MAX_PATH
     -- ofn.lpstrDefExt = (0, ^WCHAR)
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT	

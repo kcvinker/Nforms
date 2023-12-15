@@ -125,6 +125,7 @@ function ListViewColumn.new(txt: string, width: integer, ImgIndex: integer): *Li
 	this.textAlign = TextAlign.Left
 	this.index = -1
 	this.headerTextAlign = TextAlign.Center
+	this._wideText = toUTF16(txt)
 	this._hdrTxtFlag = DT_SINGLELINE | DT_VCENTER | DT_CENTER | DT_NOPREFIX
 	return this
 end
@@ -386,7 +387,7 @@ function ListView:headerCustomDraw(nmcd: LPNMCUSTOMDRAW): LRESULT
 	    nmcd.rc.left = nmcd.rc.left + 3
 	    SelectObject(nmcd.hdc, self.headerFont.handle)
 	    SetTextColor(nmcd.hdc, self.headerForeColor.ref)
-	    DrawTextW(nmcd.hdc, toUTF16(col.text), -1, &nmcd.rc, col._hdrTxtFlag)
+	    DrawTextW(nmcd.hdc, col._wideText, -1, &nmcd.rc, col._hdrTxtFlag)
 	    return CDRF_SKIPDEFAULT
 	else
 		FillRect(nmcd.hdc, &nmcd.rc, self._hdrBkBrush)

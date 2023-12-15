@@ -25,6 +25,7 @@ global UINT_MAX <comptime> = 1 << 32
 	global MM_HSCROLL: UINT <comptime> = MM_NUMBER + 9
 	global MM_VSCROLL: UINT <comptime> = MM_NUMBER + 10
 	global MM_MENU_EVENT: UINT <comptime> = MM_NUMBER + 11
+	global MM_THREAD_MSG: UINT <comptime> = MM_NUMBER + 12
 --End of My Messages
 
 -- Common Constants
@@ -94,7 +95,7 @@ end
 
 global function getXFromLPARAM(lpm: LPARAM) : integer return (@integer)(loWord(lpm)) end
 global function getYFromLPARAM(lpm: LPARAM) : integer return (@integer)(hiWord(lpm)) end
-global function getMousePos(lpm: LPARAM): POINT 
+global function getMousePos(lpm: LPARAM): POINT
 	return {(@integer)(loWord(lpm)), (@integer)(hiWord(lpm))}
 end
 
@@ -149,14 +150,14 @@ global function getCRect(c: auto): RECT
 	return rct
 end
 
---Global function. 
+--Global function.
 global function toStr(x: auto): string
 	## if x.is_stringy then
         return x
     ## else
         return tostring(x)
     ## end
-end	
+end
 
 --Common event handling functions
 	global function leftMouseDownHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
@@ -168,7 +169,7 @@ end
 	end
 
 	global function leftMouseUpHandler(this: auto, msg: UINT, wp: WPARAM, lp: LPARAM)
-		
+
 		if this.onMouseUp ~= nilptr then
 			local mea = MouseEventArgs.new(msg, wp, lp)
 			this.onMouseUp(this, &mea)
@@ -306,8 +307,14 @@ end
 	global function	wchars_to_utf8(wcarray: span(WCHAR)) : string
 		local ws = (@wstring){data = wcarray}
 		return toUTF8(ws)
-	end	
+	end
 
+	-- Use this function to send message update ui components from another thread.
+	-- You can set the `onThreadMsg` property of the form record. It's function ptr.
+	-- Set a handler function for this message. Signature = function(WPARAM, LPARAM)
+	global function sendThreadMsg(formHwnd: HWND, wpm: WPARAM, lpm: LPARAM): LRESULT
+		return SendNotifyMessageW(formHwnd, MM_THREAD_MSG, wpm, lpm)
+	end
 --End
 
 

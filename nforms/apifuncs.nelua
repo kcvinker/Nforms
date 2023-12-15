@@ -335,7 +335,7 @@ global RDW_UPDATENOW : UINT <comptime> = 256
     global LPNMITEMACTIVATE = @*NMITEMACTIVATE
 
     global OFNHOOKPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): UINT_PTR
-    global BROWSECBPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): cint    
+    global BROWSECBPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): cint
 
     global OPENFILENAMEW : type <cimport,nodecl> = @record {
         lStructSize: DWORD,
@@ -596,6 +596,8 @@ global function GetMessageW(lpMsg: LPMSG, hWnd: HWND, wMsgFilterMin: cuint, wMsg
 global function TranslateMessage(lpMsg: LPMSG): clonglong <cimport,nodecl> end
 global function DispatchMessageW(lpMsg: LPMSG): clonglong <cimport,nodecl> end
 global function SendMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
+global function SendNotifyMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
+
 global function PostMessageW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
 global function DefWindowProcW(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM): clonglong <cimport,nodecl> end
 global function TrackMouseEvent(lpEventTrack: LPTRACKMOUSEEVENT): BOOL <cimport,nodecl> end

@@ -413,7 +413,7 @@ end
         end
 
         SetBkMode(dis.hDC, 1)
-        dis.rcItem.left = mi.kind == MenuType.BaseMenu and dis.rcItem.left + 10 or dis.rcItem.left + 25       
+        dis.rcItem.left = mi.kind == MenuType.BaseMenu and dis.rcItem.left + 10 or dis.rcItem.left + 25
         SelectObject(dis.hDC, (@HGDIOBJ)(self.menubar.font.handle))
         SetTextColor(dis.hDC, txtClrRef)
         DrawTextW(dis.hDC, mi._wideText, -1, &dis.rcItem, menuTxtFlag)
@@ -603,8 +603,10 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 	case WM_CLOSE then if this:wmCloseHandler() then return 0 end
 	case WM_ACTIVATEAPP then this:wmActivateAppHandler(wpm)
 	case WM_SHOWWINDOW then this:wmShowWindowHandler()
-	case WM_MEASUREITEM then return this:_handleWmMeasureItem(lpm) 
+	case WM_MEASUREITEM then return this:_handleWmMeasureItem(lpm)
 	case WM_DRAWITEM then return this:_handleWmDrawItem(lpm)
+	case MM_THREAD_MSG then
+		if this.onThreadMsg ~= nilptr then this.onThreadMsg(wpm, lpm) end
 
 	case WM_COMMAND then
 		switch hiWord(wpm) do
@@ -657,7 +659,7 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
        	local mid = (@UINT)(loWord(wpm)) -- Could be an id of a child menu or index of a child menu
         local hwwpm = hiWord(wpm)
         if menu_okay then
-        	menu_okay = false      	
+        	menu_okay = false
             local menu : *MenuItem
             switch hwwpm do
             case 33152 then -- A normal child menu. We can use mid ad menu id.
@@ -683,7 +685,7 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
         if menu_okay and menu.onCloseup ~= nilptr then
             local ea : EventArgs = {}
             menu.onCloseup(menu, &ea)
-        end	
+        end
 	end
 
 
@@ -706,7 +708,7 @@ end
 	    this._menuGrayBrush = Color.getHBrush(0xced4da)
 	    this._menuGrayCref = Color.getColorRef(0x979dac)
 	    this._pForm.menubar = this
-	    menubar_additems_internal(this, menuitems)    
+	    menubar_additems_internal(this, menuitems)
 	    return this
 	end
 
@@ -744,8 +746,8 @@ end
 	end
 
 	-- Private
-	function menubar_additems_internal(mbar: *MenuBar, items: span(string))	
-		for _, sitem in ipairs(items) do		
+	function menubar_additems_internal(mbar: *MenuBar, items: span(string))
+		for _, sitem in ipairs(items) do
 			local mi = MenuItem.new(sitem, MenuType.BaseMenu, mbar.handle, mbar._menuCount)
 			mbar._menuCount = mbar._menuCount + 1
 			mi._mbar = mbar
@@ -753,7 +755,7 @@ end
 	        mi._formMenu = true
 	        mbar.menus[sitem] = mi
 	        mbar._pForm._menuList:push(mi)
-		end   
+		end
 	end
 
 	--Private function
@@ -788,7 +790,7 @@ end
 	end
 
 	function MenuItem:addItems(menuitems: span(string))
-		self:changeType()	
+		self:changeType()
 		for _, sitem in ipairs(menuitems) do
 			local typ : MenuType = sitem == "|" and MenuType.Separator or MenuType.NormalMenu
 			-- if typ == MenuType.Seperator then sitem = nil end
@@ -823,15 +825,15 @@ end
 		-- print(string.format("Menu handle for %s is %d", self.text, (@integer)(self.handle)))
 		switch self.kind do
 		case MenuType.BaseMenu, MenuType.DropDownMenu then
-			if self._menuCount > 0 then			
-				for _, menu in pairs(self.menus) do						
-					menu:createHandle() 					
+			if self._menuCount > 0 then
+				for _, menu in pairs(self.menus) do
+					menu:createHandle()
 				end
 			end
-			self:insertMenuInternal()	
-			
+			self:insertMenuInternal()
+
 		case MenuType.NormalMenu then self:insertMenuInternal()
-		case MenuType.Separator then 
+		case MenuType.Separator then
 			-- print(string.format("p handle in sep : %d", (@integer)(self.parentHandle)))
 			AppendMenuW(self.parentHandle, MF_SEPARATOR, 0, nilptr)
 		end
@@ -844,9 +846,9 @@ end
 		if self.font.handle == nilptr then self.font:createHandle() end
 
 	    -- If there are menus, we need to create the handles for them too.
-	    if self._menuCount > 0 then	    	
-			for _, menu in pairs(self.menus) do 
-				menu:createHandle() 
+	    if self._menuCount > 0 then
+			for _, menu in pairs(self.menus) do
+				menu:createHandle()
 			end
 		end
 	    SetMenu(self._pForm.handle, self.handle)
@@ -870,13 +872,13 @@ end
 
 -- ===========================================Context Menu==============================================================
 	local function cmenuWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT <forwarddecl> end
-	
-	local function createDummyControl(pHwnd: HWND): HWND
-		return CreateWindowExW(0, toUTF16("Button"), nilptr, WS_CHILD, 
-								0, 0, 0, 0, pHwnd, nilptr, app.hInstance, nilptr)
-	end	
 
-	function ContextMenu.new(ctl: ControlConcept) : *ContextMenu	
+	local function createDummyControl(pHwnd: HWND): HWND
+		return CreateWindowExW(0, toUTF16("Button"), nilptr, WS_CHILD,
+								0, 0, 0, 0, pHwnd, nilptr, app.hInstance, nilptr)
+	end
+
+	function ContextMenu.new(ctl: ControlConcept) : *ContextMenu
 		local this : *ContextMenu = default_allocator:new(@ContextMenu)
 	    this.parent = ctl
 	    this.handle = CreatePopupMenu()
@@ -893,7 +895,7 @@ end
 	    this._dummyHwnd = createDummyControl(ctl.handle)
 	    setSubClass(this._dummyHwnd, this, cmenuWndProc)
 	    return this
-	end	
+	end
 
 	global function addContextMenu(ctl: ControlConcept, items: span(string))
 		local cmenu = ContextMenu.new(ctl)
@@ -903,26 +905,38 @@ end
 				local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
 	            local mi = MenuItem.new(item, mtyp, cmenu.handle, cmenu._menuCount)
 	            cmenu._menuCount = cmenu._menuCount + 1
-	            if mtyp == MenuType.ContextMenu then
-	                mi:insertMenuInternal()
-	                cmenu.menus:push(mi)
-	            elseif mtyp == MenuType.Separator then
-	                AppendMenuW(cmenu.handle, MF_SEPARATOR, 0, nilptr)
-	            end
+	            self.menus[item] = mi
 			end
-		end	
+		end
+	end
+
+	function MenuItem:insertCmenuInternal()
+		if #self.menus > 0 then
+			for _, menu in pairs(self.menus) do
+				menu:insertCmenuInternal()
+			end
+		end
+		if self.kind == MenuType.ContextMenu then
+            self:insertMenuInternal()
+        elseif self.kind == MenuType.Separator then
+            AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
+        end
+	end
+
+	function ContextMenu:createCmenuHandle()
+		if #self.menus > 0 then
+			for _, menu in pairs(self.menus) do
+				menu:insertCmenuInternal()
+			end
+		end
+		self._menuInserted = true
 	end
 
 	function ContextMenu:addItem(item: string)
 		local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
         local mi = MenuItem.new(item, mtyp, self.handle, self._menuCount)
         self._menuCount = self._menuCount + 1
-        if mtyp == MenuType.ContextMenu then
-            mi:insertMenuInternal()
-            self.menus:push(mi)
-        elseif mtyp == MenuType.Separator then
-            AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
-        end
+        self.menus[item] = mi
     end
 
     function ContextMenu:addItems(items: span(string))
@@ -931,17 +945,13 @@ end
 				local mtyp : MenuType = item == "|" and MenuType.Separator or MenuType.ContextMenu
 	            local mi = MenuItem.new(item, mtyp, self.handle, self._menuCount)
 	            self._menuCount = self._menuCount + 1
-	            if mtyp == MenuType.ContextMenu then
-	                mi:insertMenuInternal()
-	                self.menus:push(mi)
-	            elseif mtyp == MenuType.Separator then
-	                AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
-	            end
+	            self.menus[item] = mi
 			end
-		end	
+		end
     end
 
     function ContextMenu:show(lpm: LPARAM)
+    	if not self._menuInserted then self:createCmenuHandle() end
     	local pt = getMousePos(lpm)
 	    if pt.x == -1 or pt.y == -1 then
 	        -- ContextMenu message generated by keybord shortcut.
@@ -954,7 +964,7 @@ end
 
 	function ContextMenu:getMenuItemFromID(idnum: UINT): (*MenuItem, boolean)
 		if #self.menus > 0 then
-	        for _, menu in ipairs(self.menus) do
+	        for _, menu in pairs(self.menus) do
 	            if menu.idNum == idnum then return menu, true end
 	        end
 	    end
@@ -969,7 +979,7 @@ end
 	function cmenuWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UINT_PTR, refData: DWORD_PTR): LRESULT
 		local cmenu = (@*ContextMenu)((pointer)(refData))
 		switch msg do
-		case WM_DESTROY then 
+		case WM_DESTROY then
 			-- print("cmenu destroyed")
 			DestroyMenu(cmenu.handle)
 			RemoveWindowSubclass(hw, cmenuWndProc, scID)
@@ -985,7 +995,7 @@ end
 	        local mi = (@*MenuItem)(dis.itemData)
 	        local txtClrRef : COLORREF = mi.fgColor.ref
 	        if dis.itemState == 257 then
-	            if mi._isEnabled then 
+	            if mi._isEnabled then
 	                local rc = RECT{dis.rcItem.left + 4, dis.rcItem.top + 2, dis.rcItem.right, dis.rcItem.bottom - 2}
 	                FillRect(dis.hDC, &rc, cmenu._hotBgBrush)
 	                FrameRect(dis.hDC, &rc, cmenu._borderBrush)
@@ -1005,7 +1015,7 @@ end
 	        SetTextColor(dis.hDC, txtClrRef)
 	        DrawTextW(dis.hDC, mi._wideText, -1, &dis.rcItem, DT_LEFT | DT_SINGLELINE | DT_VCENTER)
 	        return 0
-		
+
 	    case WM_ENTERMENULOOP then
 	        if cmenu.onMenuShown ~= nilptr then
 	            local ea : EventArgs = {}
