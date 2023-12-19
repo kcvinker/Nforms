@@ -64,6 +64,7 @@ cinclude "<commctrl.h>"
     global wstring = @record{ data: span(cwchar_t) }
     global WNDPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
     global SUBCLASSPROC: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM, UINT_PTR, DWORD_PTR): LRESULT
+    global TIMERPROC: type <cimport,nodecl> = @function(HWND, UINT, UINT_PTR, DWORD)
 --End of Types
 
 global SW_SHOW : DWORD <comptime> = 5
@@ -569,6 +570,8 @@ global function FrameRect(dch : HDC, rct : LPRECT, hbr : HBRUSH) : cint <cimport
 global function DrawTextW(hdc : HDC, lp_txt : LPCWSTR, cch_txt : cint, lprc : LPRECT, format : UINT) : cint <cimport,nodecl> end
 global function TrackPopupMenu(hmenu: HMENU, uFlags: UINT, x: cint, y: cint, nReserved: cint, hwnd: HWND, prc: LPRECT) : cint <cimport,nodecl> end
 global function DestroyMenu(hmenu: HMENU) : BOOL <cimport,nodecl> end
+global function SetTimer(hWnd: HWND, nID: UINT_PTR, uEla: UINT, lpfn: TIMERPROC) : UINT_PTR <cimport,nodecl> end
+global function KillTimer(hWnd: HWND, nID: UINT_PTR) : BOOL <cimport,nodecl> end
 
 
 global function makeIntResW(i : auto) : LPCWSTR return (@LPCWSTR)((pointer)((@*culong)(i))) end

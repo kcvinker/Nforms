@@ -26,6 +26,7 @@ global UINT_MAX <comptime> = 1 << 32
 	global MM_VSCROLL: UINT <comptime> = MM_NUMBER + 10
 	global MM_MENU_EVENT: UINT <comptime> = MM_NUMBER + 11
 	global MM_THREAD_MSG: UINT <comptime> = MM_NUMBER + 12
+	global MM_TIMER_ADDED: UINT <comptime> = MM_NUMBER + 13
 --End of My Messages
 
 -- Common Constants
@@ -309,7 +310,7 @@ end
 		return toUTF8(ws)
 	end
 
-	-- Use this function to send message update ui components from another thread.
+	-- Use this function to update ui components from another thread.
 	-- You can set the `onThreadMsg` property of the form record. It's function ptr.
 	-- Set a handler function for this message. Signature = function(WPARAM, LPARAM)
 	global function sendThreadMsg(formHwnd: HWND, wpm: WPARAM, lpm: LPARAM): LRESULT

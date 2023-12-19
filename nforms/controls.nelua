@@ -30,6 +30,8 @@ end) ]#
 global MenuBar <forwarddecl> = @record{}
 global MenuItem <forwarddecl> = @record{}
 global ContextMenu <forwarddecl> = @record{}
+global Timer <forwarddecl> = @record{}
+global Form <forwarddecl> = @record{}
 
 global EventHandler = @function(ctrl: pointer, eargs: *EventArgs): void
 global MouseEventHandler = @function(ctrl: pointer, eargs: *MouseEventArgs): void
@@ -39,6 +41,7 @@ global DateTimeEventHandler = @function(ctrl: pointer, eargs: *DateTimeEventArgs
 global ContextMenuEventHandler = @function(ctrl: *ContextMenu, eargs: *EventArgs): void
 global MenuEventHandler = @function(ctrl: *MenuItem, eargs: *EventArgs): void
 global ThreadMsgHandler = @function(wpm: WPARAM, lpm: LPARAM): void
+global TimerTickHandler = @function(form: pointer, eargs: *EventArgs): void
 
 global FormStyle = @enum {None = 0, FixedSingle, Fixed3D, FixedDialog, FixedTool, Sizable, SizableTool, Hidden}
 global FormState = @enum {Normal = 0, Maximized, Minimized}
@@ -82,6 +85,7 @@ global Form = @record
 
 	-- Private properties
 	_count: uinteger, -- To know how many forms are there
+	_staticTimerID: UINT_PTR,
 	_isCreated: boolean,
 	_isTextable: boolean,
 	_winStyle: DWORD,
@@ -97,7 +101,7 @@ global Form = @record
 	_menuNumber: integer,
 	_menuList: vector(*MenuItem),
 	_controls: vector(Control),
-
+	_timerMap: hashmap(UINT_PTR, pointer),
 
 	-- Events
 	onMouseDown: MouseEventHandler,
@@ -1182,6 +1186,16 @@ global TreeView = @record {
 	onMouseLeave: EventHandler,
 }
 ## TreeView.value.is_control = true
+
+global Timer = @record {
+	interval : uinteger,
+	onTick: EventHandler,
+	_idNum : UINT_PTR,
+	_isEnabled: boolean,
+	_pHwnd: HWND,
+	-- _parent: *Form,
+}
+
 
 -- ##[[
 -- 	local control_set = {["Button"]=true, ["Calendar"]=true, ["CheckBox"]=true, ["ComboBox"]=true, ["DateTimePicker"]=true, ["GroupBox"]=true, ["Label"]=true, ["ListBox"]=true, ["ListView"]=true, ["NumberPicker"]=true, ["ProgressBar"]=true, ["RadioButton"]=true, ["TextBox"]=true, ["TrackBar"]=true, ["TreeView"]=true}

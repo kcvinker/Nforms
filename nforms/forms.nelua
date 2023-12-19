@@ -130,6 +130,7 @@ local function regWindow() <forwarddecl> end
 function ContextMenu:show(lpm: LPARAM) <forwarddecl> end
 function MenuBar:createHandle() <forwarddecl> end
 function MenuItem:getChildMenuFromID(idnum: UINT) : (boolean, *MenuItem) <forwarddecl> end
+function Timer:timer_dtor() <forwarddecl> end
 
 -- local function getChildControl(ctl: pointer, ctype: ControlType) : auto <forwarddecl> end
 -- global MenuClickHandler: type <cimport,nodecl> = @function(HWND, UINT, WPARAM, LPARAM): LRESULT
@@ -326,6 +327,34 @@ function Form:setGradientBackColor(clr1: uinteger, clr2: uinteger, top2Bottom: b
 	self._gdraw.c2 = Color.new(clr2)
 	self._drawMode = FormDrawMode.Gradient
 	suddenRedraw(self)
+end
+
+function Form:addTimer(interval: uinteger, tickHandler: EventHandler): *Timer
+	local this : *Timer = default_allocator:new(@Timer)
+	this.interval = interval == 0 and 200 or interval
+	this.onTick = tickHandler
+	this._pHwnd = self.handle
+	this._idNum = (@UINT_PTR)(this)
+	self._timerMap[this._idNum] = this
+	return this
+end
+
+function Timer:start()
+	self._isEnabled = true
+	SetTimer(self._pHwnd, self._idNum, self.interval, nilptr)
+end
+
+function Timer:stop()
+	KillTimer(self._pHwnd, self._idNum)
+	self._isEnabled = false
+end
+
+function Timer:timer_dtor()
+	if self._isEnabled then 
+		KillTimer(self._pHwnd, self._idNum) 
+		print("Timer freed")
+	end
+	self = nilptr
 end
 
 --Private function
@@ -563,6 +592,12 @@ end
 	function Form:destroy()
 		DeleteObject(self.font.handle)
 		-- if self._drawMode == FormDrawMode.Gradient then self._gdraw:destroy() end
+		if #self._timerMap > 0 then
+			for up, ptmr in pairs(self._timerMap) do
+				local tm : *Timer = (@*Timer)(ptmr)
+				tm:timer_dtor() 
+			end
+		end	
 		self = nilptr
 	end
 
@@ -607,6 +642,16 @@ function windowProc(hw : HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT
 	case WM_DRAWITEM then return this:_handleWmDrawItem(lpm)
 	case MM_THREAD_MSG then
 		if this.onThreadMsg ~= nilptr then this.onThreadMsg(wpm, lpm) end
+
+	case WM_TIMER then
+		local okay, ptimer = this._timerMap:has_and_get((@UINT_PTR)(wpm))
+		if okay then 
+			local timer = (@*Timer)(ptimer)
+			if timer.onTick ~= nilptr then
+				local ea : EventArgs = {}
+				timer.onTick(this, &ea)
+			end			
+		end
 
 	case WM_COMMAND then
 		switch hiWord(wpm) do

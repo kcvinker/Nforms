@@ -20,9 +20,23 @@ mbr.menus["Edit"]:addItems({"Cut", "Copy", "Paste"})
 mbr.menus["Format"]:addItems({"Font", "Line Space", "Paragraph"})
 mbr.menus["File"].menus["Windows"]:addItems({"Win7", "Win8", "Win10", "Win11"})
 
+local function timer_tick(p: pointer, e: *EventArgs)
+	print("timer ticked...")
+end
+
+--Let's add a timer which ticks at every 800 ms. 
+local tmr = frm:addTimer(800, &timer_tick)
+
 local b1 = Button.new{frm, "Normal Btn", create = true}
+
+--This function will start our timer when we click the button b2
+local function b2_click(p: pointer, e: *EventArgs)
+	tmr:start()
+end
 local b2 = Button.new{frm, "Flat Color", xpos = right(b1, 10), 10, create = true}
 b2:setBackColor(0xfdc500)
+b2.onClick = &b2_click
+
 local b3 = Button.new{frm, "Gradient", xpos = right(b2, 10), 10, create = true}
 b3:setGradientColor(0xeeef20, 0x70e000)
 
