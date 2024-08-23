@@ -100,12 +100,10 @@ global function getMousePos(lpm: LPARAM): POINT
 	return {(@integer)(loWord(lpm)), (@integer)(hiWord(lpm))}
 end
 
-global function getMousePosOnMsg() : POINT
-	local result : POINT
+global function getMousePosOnMsg(pt: *POINT)
     local dw_value = GetMessagePos()
-    result.x = LONG(loWord(dw_value))
-    result.y = LONG(hiWord(dw_value))
-	return result
+    pt.x = LONG(loWord(dw_value))
+    pt.y = LONG(hiWord(dw_value))	
 end
 
 global function increment(x: auto): auto
