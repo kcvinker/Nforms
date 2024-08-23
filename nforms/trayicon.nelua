@@ -1,0 +1,233 @@
+
+-- TrayIcon module - Created on 23-Aug-2024 20:57
+
+--[[-----------------------In this module--------------------------
+TrayIcon record and it's features.
+
+
+]]
+
+
+require "nforms.apifuncs"
+require "nforms.common"
+require 'nforms.controls'
+require "memory"
+
+--Constants
+	local LR_DEFAULTCOLOR: UINT <comptime> = 0x00000000
+	local LR_LOADFROMFILE: UINT <comptime> = 0x00000010
+	local LIMG_FLAG: UINT = LR_DEFAULTCOLOR | LR_LOADFROMFILE
+
+	local NIM_ADD: DWORD <comptime> = 0x00000000
+	local NIM_MODIFY: DWORD <comptime> = 0x00000001
+	local NIM_DELETE: DWORD <comptime> = 0x00000002
+	local NIM_SETFOCUS: DWORD <comptime> = 0x00000003
+	local NIM_SETVERSION: DWORD <comptime> = 0x00000004
+
+	local NIF_MESSAGE: UINT <comptime> = 0x00000001
+	local NIF_ICON: UINT <comptime> = 0x00000002
+	local NIF_TIP: UINT <comptime> = 0x00000004
+	local NIF_STATE: UINT <comptime> = 0x00000008
+	local NIF_INFO: UINT <comptime> = 0x00000010
+	local NIF_GUID: UINT <comptime> = 0x00000020
+	local NIF_REALTIME: UINT <comptime> = 0x00000040
+	local NIF_SHOWTIP: UINT <comptime> = 0x00000080
+
+	local NIS_HIDDEN: DWORD <comptime> = 0x00000001
+	local NIS_SHAREDICON: DWORD <comptime> = 0x00000002
+	local NIIF_NONE: DWORD <comptime> = 0x00000000
+	local NIIF_INFO: DWORD <comptime> = 0x00000001
+	local NIIF_WARNING: DWORD <comptime> = 0x00000002
+	local NIIF_ERROR: DWORD <comptime> = 0x00000003
+	local NIIF_USER: DWORD <comptime> = 0x00000004
+	local NIIF_NOSOUND: DWORD <comptime> = 0x00000010
+	local NIIF_LARGE_ICON: DWORD <comptime> = 0x00000020
+	local NIIF_RESPECT_QUIET_TIME: DWORD <comptime> = 0x00000080
+	local NIIF_ICON_MASK: DWORD <comptime> = 0x0000000F
+
+	local NIN_SELECT           : UINT <comptime> =   (WM_USER + 0)
+	local NINF_KEY             : UINT <comptime> =   0x1
+	local NIN_KEYSELECT        : UINT <comptime> =   (NIN_SELECT | NINF_KEY)
+	local NIN_BALLOONSHOW      : UINT <comptime> =   (WM_USER + 2)
+	local NIN_BALLOONHIDE      : UINT <comptime> =   (WM_USER + 3)
+	local NIN_BALLOONTIMEOUT   : UINT <comptime> =   (WM_USER + 4)
+	local NIN_BALLOONUSERCLICK : UINT <comptime> =   (WM_USER + 5)
+	local NIN_POPUPOPEN        : UINT <comptime> =   (WM_USER + 6)
+	local NIN_POPUPCLOSE       : UINT <comptime> =   (WM_USER + 7)
+
+--End Constants
+
+function TrayIcon:createMsgWindow() <forwarddecl> end
+local function trayWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM): LRESULT <forwarddecl> end
+
+function TrayIcon.new(tooltip: string, iconpath: string) : *TrayIcon
+	if app.trayHwnd ~= nilptr then 
+		print("TrayIcon is already created!")
+		return nilptr
+	end
+	local this : *TrayIcon = default_allocator:new(@TrayIcon)
+	this:createMsgWindow()
+	
+	if iconpath == "" then
+        this._hTrayIcon = LoadIconW(nilptr, IDI_SHIELD)
+    else
+        this._hTrayIcon = LoadImageW(nilptr, toUTF16(iconpath), IMAGE_ICON, 0, 0, LIMG_FLAG)
+        if this._hTrayIcon == nilptr then
+        	local err = GetLastError()
+            this._hTrayIcon = LoadIconW(nilptr, IDI_SHIELD)
+            io.printf("Can't create icon with %s. Error code: %d\n", iconpath, err)           
+        end       
+    end
+    local tipTxt = toWstrArray(tooltip)
+    this._nid.cbSize = #NOTIFYICONDATA
+    this._nid.hWnd = this._msgWinHwnd
+    this._nid.uID = 1
+    this._nid.dummy.uVersion = 4
+    this._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+    this._nid.uCallbackMessage = MM_TRAY_MSG
+    this._nid.hIcon = this._hTrayIcon
+    -- memory.copy(&this._nid.szTip[0], &tipTxt.data[0], #tipTxt)   
+    for i, v in ipairs(tipTxt.data) do
+		if i > 128  then break end
+		this._nid.szTip[i] =  v
+	end	
+    Shell_NotifyIconW(NIM_ADD, &this._nid)
+    -- io.printf("tip size %d, nid size %d\n", #tipTxt, #NOTIFYICONDATA)
+    return this
+end
+
+function TrayIcon:resetIconInternal()
+	self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+    self._nid.hIcon = self._hTrayIcon
+    Shell_NotifyIconW(NIM_MODIFY, &self._nid)
+    self._resetIcon = false -- Revert to the default state
+end
+
+function TrayIcon:createMsgWindow()
+	--First of all, register our window class
+	local trayWndClass = toUTF16("Nforms_Tray_Window")
+	local wc : WNDCLASSEXW
+	wc.cbSize = #WNDCLASSEXW
+	wc.lpfnWndProc = trayWndProc
+	wc.hInstance = app.hInstance
+	wc.lpszClassName = trayWndClass
+	local x = RegisterClassExW(&wc)
+	-- print("tray reg res", x)
+	
+	self._msgWinHwnd = CreateWindowExW(0, trayWndClass, nilptr, 0, 0, 0, 0, 0, 
+								HWND_MESSAGE, nilptr, app.hInstance, nilptr)
+	if self._msgWinHwnd ~= nilptr then
+		app.trayHwnd = self._msgWinHwnd
+		SetWindowLongPtrW(self._msgWinHwnd, GWLP_USERDATA, (@LONG_PTR)(self))
+	end 
+end
+
+function TrayIcon:__gc()
+	print("TrayIcon dtor worked")
+	if self._msgWinHwnd ~= nilptr then
+		local x = DestroyWindow(self._msgWinHwnd)
+		io.printf("Destroyed tray msg window in trayicon dtor, res: %s\n", x)
+		if x ~= 0 then app.trayHwnd = nilptr end
+	end
+end
+
+function trayWndProc(hw: HWND, msg: cuint, wpm: WPARAM, lpm: LPARAM): LRESULT
+	-- print("tray wndproc", msg)
+	switch msg do
+	case WM_DESTROY then
+		local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+		Shell_NotifyIconW(NIM_DELETE, &this._nid)
+		if this._hTrayIcon ~= nilptr then DestroyIcon(this._hTrayIcon) end
+        -- if this._cmenuUsed then this.contextMenu.destroy() end
+        this._msgWinHwnd = nilptr
+		print("tray msg-only window destroyed")
+
+	case MM_TRAY_MSG then
+		switch lpm do
+        case NIN_BALLOONSHOW then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onBalloonShow ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onBalloonShow(this, &ea)
+            end
+
+        case NIN_BALLOONTIMEOUT then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onBalloonClose ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onBalloonClose(this, &ea)
+            end
+            if this._resetIcon then this:resetIconInternal() end
+
+        case NIN_BALLOONUSERCLICK then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onBalloonClick ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onBalloonClick(this, &ea)
+            end
+            if this._resetIcon then this:resetIconInternal() end
+
+        case WM_LBUTTONDOWN then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onLeftMouseDown ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onLeftMouseDown(this, &ea)
+            end
+
+        case WM_LBUTTONUP then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onLeftMouseUp ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onLeftMouseUp(this, &ea)
+            end
+            if this.onLeftClick ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onLeftClick(this, &ea)
+            end
+            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.leftClick then 
+                this.contextMenu:show(0)
+            end
+
+        case WM_LBUTTONDBLCLK then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onLeftDoubleClick ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onLeftDoubleClick(this, &ea)
+            end
+            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.leftDoubleClick then 
+                this.contextMenu:show(0)
+            end
+
+        case WM_RBUTTONDOWN then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onRightMouseDown ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onRightMouseDown(this, &ea)
+            end
+
+        case WM_RBUTTONUP then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onRightMouseUp ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onRightMouseUp(this, &ea)
+            end
+            if this.onRightClick ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onRightClick(this, &ea)
+            end
+            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.rightClick then 
+                this.contextMenu:show(0)
+            end
+
+        case WM_MOUSEMOVE then
+            local this = (@*TrayIcon)(GetWindowLongPtrW(hw, GWLP_USERDATA))
+            if this.onMouseMove ~= nilptr then
+            	local ea: EventArgs = {}
+            	this.onMouseMove(this, &ea)
+            end
+        end
+	-- else
+   	-- 	return DefWindowProcW(hw, msg, wpm, lpm)
+	end
+	return DefWindowProcW(hw, msg, wpm, lpm)
+end

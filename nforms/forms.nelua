@@ -123,6 +123,12 @@ require "io"
 
 -- /////////////////////////////////
 global app : Application
+global function appDestructor()
+	if app.trayHwnd ~= nilptr then 
+		DestroyWindow(app.trayHwnd)
+		print("tray msg-only window destroyed from appDestructor")
+	end
+end
 -- ////////////////////////////////
 
 local function windowProc(hw : HWND, msg: cuint, wp: WPARAM, lp: LPARAM): LRESULT <forwarddecl> end
@@ -310,6 +316,7 @@ function Form:show()
 		app.mainLoopStarted = true
 		app.mainWinHandle = self.handle
 		mainLoop()
+		appDestructor()
 	end
 end
 
@@ -917,7 +924,6 @@ end
 
 -- ===========================================Context Menu==============================================================
 	
-	local HWND_MESSAGE <comptime> = (@HWND)((@usize)(-0x3))	
 	local TPM_RETURNCMD : UINT <comptime> = 0x100
 	local cmenuMsgWinReg : boolean = false
 	local cmenuWinClass : LPCWSTR
@@ -1088,7 +1094,7 @@ end
 		wc.hInstance = app.hInstance
 		wc.lpszClassName = cmenuWinClass
 		local x = RegisterClassExW(&wc)
-		print("reg res ", x)
+		print("cmenu reg res ", x)
 		cmenuMsgWinReg = true
 	end
 

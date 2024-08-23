@@ -1,6 +1,8 @@
 --font module - Created on 28-Feb-2023 08:57 AM
 
 require "nforms.apifuncs"
+require "memory"
+-- require "io"
 
 local DEFAULT_CHARSET : byte <comptime> = 1
 local OUT_DEFAULT_PRECIS : byte <comptime> = 0
@@ -65,16 +67,18 @@ function Font:createHandle(hwnd: HWND)
 	local hdc : HDC = GetDC(hwnd)
 	local fontHeight: LONG = -MulDiv(self.size, GetDeviceCaps(hdc, LOGPIXELSY), 72)
 	ReleaseDC(hwnd, hdc)
-	local fname: [32]WCHAR
+	
 	local wfname = toWstrArray(self.name)
-	for i, v in ipairs(wfname.data) do
-		if i > 32 then break end
-		fname[i] =  v
-	end
+	-- local fname: [32]WCHAR = span.as(WCHAR)
+	-- for i, v in ipairs(wfname.data) do
+	-- 	if i > 32 then break end
+	-- 	fname[i] =  v
+	-- end
+	-- fname = wfname.data
 	local lf : LOGFONTW
 	lf.lfItalic = self.italics and 1 or 0
 	lf.lfUnderline = self.underline and 1 or 0
-	lf.lfFaceName = fname
+	memory.copy(&lf.lfFaceName[0], &wfname.data[0], #wfname)
 	lf.lfHeight = fontHeight
 	lf.lfWeight = (@LONG)(self.weight)
 	lf.lfCharSet = DEFAULT_CHARSET

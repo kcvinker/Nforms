@@ -9,18 +9,24 @@ require 'nforms.color'
 
 global Application = @record
 {
+	className : string,
 	started : boolean,
 	mainLoopStarted: boolean,
-	hInstance : HINSTANCE,
-	className : string,
+	isDateInit: boolean,
 	frmCount : integer,
 	screenWidth: integer,
 	screenHeight: integer,
-	mainWinHandle: HWND,
-	isDateInit: boolean,
-	iccEx: INITCOMMONCONTROLSEX,
 	menuNumber: uinteger,
+	hInstance : HINSTANCE,
+	mainWinHandle: HWND,
+	trayHwnd: HWND,
+	iccEx: INITCOMMONCONTROLSEX,
+	
 }
+
+-- function Application.__gc()
+-- 	print("Application close worked")
+-- end
 
 global ControlConcept = #[concept(function(attr)
 	if attr.type.subtype.is_control then return true end
@@ -42,6 +48,7 @@ global ContextMenuEventHandler = @function(ctrl: *ContextMenu, eargs: *EventArgs
 global MenuEventHandler = @function(ctrl: *MenuItem, eargs: *EventArgs): void
 global ThreadMsgHandler = @function(wpm: WPARAM, lpm: LPARAM): void
 global TimerTickHandler = @function(form: pointer, eargs: *EventArgs): void
+
 
 global FormStyle = @enum {None = 0, FixedSingle, Fixed3D, FixedDialog, FixedTool, Sizable, SizableTool, Hidden}
 global FormState = @enum {Normal = 0, Maximized, Minimized}
@@ -1194,6 +1201,32 @@ global Timer = @record {
 	_isEnabled: boolean,
 	_pHwnd: HWND,
 	-- _parent: *Form,
+}
+
+global TrayMenuTrigger = @enum {none = 0, leftClick, leftDoubleClick, rightClick }
+global TrayIcon = @record {
+		menuTrigger: TrayMenuTrigger, --public members
+		contextMenu: *ContextMenu,
+		userData: pointer,
+
+		_resetIcon: boolean, --private members
+		_cmenuUsed: boolean,
+		_retainIcon: boolean,
+		_hTrayIcon: HICON,
+		_msgWinHwnd: HWND,
+		_nid: NOTIFYICONDATA,
+
+		onBalloonShow: EventHandler, --events
+		onBalloonClose: EventHandler,
+		onBalloonClick: EventHandler,   
+		onMouseMove: EventHandler,    
+		onLeftMouseDown: EventHandler,
+		onLeftMouseUp: EventHandler,    
+		onRightMouseDown: EventHandler,
+		onRightMouseUp: EventHandler,
+		onLeftClick: EventHandler,
+		onRightClick: EventHandler,
+		onLeftDoubleClick: EventHandler
 }
 
 

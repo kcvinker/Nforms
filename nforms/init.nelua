@@ -22,4 +22,5 @@ require "nforms.textbox"
 require "nforms.trackbar"
 require "nforms.treeview"
 require "nforms.dialogs"
+require "nforms.trayicon"
 

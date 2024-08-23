@@ -67,6 +67,12 @@ cinclude "<commctrl.h>"
     global TIMERPROC: type <cimport,nodecl> = @function(HWND, UINT, UINT_PTR, DWORD)
 --End of Types
 
+function wstring:__len() : number
+    return #self.data 
+end
+
+
+
 global SW_SHOW : DWORD <comptime> = 5
 global RDW_INVALIDATE : UINT <comptime> = 1
 global RDW_INTERNALPAINT : UINT <comptime> = 2
@@ -434,6 +440,25 @@ global RDW_UPDATENOW : UINT <comptime> = 256
     }
     global LPDRAWITEMSTRUCT = @*DRAWITEMSTRUCT
 
+    global NOTIFYICONDATA  = @record {
+        cbSize: DWORD,
+        hWnd: HWND,
+        uID: UINT,
+        uFlags: UINT,
+        uCallbackMessage: UINT,
+        hIcon: HICON,
+        szTip: [128]WCHAR,
+        dwState: DWORD,
+        dwStateMask: DWORD,
+        balloonText: [256]WCHAR,
+        dummy: union {
+            uTimeout: UINT,
+            uVersion: UINT,
+        },
+        balloonTitle: [64]WCHAR,
+        dwInfoFlags: DWORD
+    }
+
 --End of Structs
 
 -- Common Constants
@@ -577,6 +602,15 @@ global function KillTimer(hWnd: HWND, nID: UINT_PTR) : BOOL <cimport,nodecl> end
 global function makeIntResW(i : auto) : LPCWSTR return (@LPCWSTR)((pointer)((@*culong)(i))) end
 global IDI_APPLICATION = makeIntResW(32512) --(@LPCWSTR)(p_res_id)
 global IDC_ARROW = makeIntResW(32512) --makeIntResW(32512) --(@LPCWSTR)(p_res_id)
+global IDI_ERROR = makeIntResW(32513)
+global IDI_QUESTION = makeIntResW(32514)
+global IDI_EXCLAMATION = makeIntResW(32515)
+global IDC_ASTERIK = makeIntResW(32516)
+global IDI_WINLOGO = makeIntResW(32517)
+global IDI_SHIELD = makeIntResW(32518)
+global IMAGE_BITMAP: UINT <comptime> = 0
+global IMAGE_ICON: UINT <comptime> = 1
+global IMAGE_CURSOR: UINT <comptime> = 2
 
 --global function LoadLibraryExW(lpLibFileName: LPCWSTR, hFile: HANDLE, dwFlags: culong): HMODULE <cimport,nodecl> end
 --global function GetModuleHandleExW(dwFlags: culong, lpModuleName: LPCWSTR, phModule: *HMODULE): cint <cimport,nodecl> end
@@ -629,10 +663,10 @@ global function GetDC(hWnd: HWND): HDC <cimport,nodecl> end
 global function ReleaseDC(hWnd: HWND, hDC: HDC): cint <cimport,nodecl> end
 global function MessageBoxW(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: cuint): cint <cimport,nodecl> end
 global function LoadIconW(hInstance: HINSTANCE, lpIconName: LPCWSTR): HICON <cimport,nodecl> end
-global function LoadImageW(hInst: HINSTANCE, lpIconName: LPCWSTR, typ: UINT, cx: cint, cy: cint, ful: UINT): HANDLE <cimport,nodecl> end
+global function LoadImageW(hInst: HINSTANCE, lpIconName: LPCWSTR, typ: UINT, cx: cint, cy: cint, ful: UINT): HICON <cimport,nodecl> end
 
 global function LoadCursorW(hInstance: HINSTANCE, lpCursorName: LPCWSTR): HCURSOR <cimport,nodecl> end
-global function LoadCursorA(hInstance: HINSTANCE, lpCursorName: *cstring): HCURSOR <cimport,nodecl> end
+global function DestroyIcon(hico: HICON): BOOL <cimport,nodecl> end
 
 global function SetWindowLongPtrW(hWnd: HWND, nIndex: cint, dwNewLong : LONG_PTR): LONG_PTR <cimport,nodecl> end
 global function GetWindowLongPtrW(hWnd: HWND, nIndex: cint): LONG_PTR <cimport,nodecl> end
@@ -687,6 +721,7 @@ global function GetSaveFileNameW(lpOfn: LPOPENFILENAMEW): BOOL <cimport,nodecl> 
 
 global function SHBrowseForFolderW(p1: LPBROWSEINFOW): PIDLIST_ABSOLUTE <cimport,nodecl> end
 global function SHGetPathFromIDListW(p1: PCIDLIST_ABSOLUTE, p2: LPWSTR): BOOL <cimport,nodecl> end
+global function Shell_NotifyIconW(p1: DWORD, p2: *NOTIFYICONDATA): BOOL <cimport,nodecl> end
 
 global function CoTaskMemFree(p1: LPVOID) <cimport,nodecl> end
 
