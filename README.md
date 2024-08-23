@@ -91,6 +91,15 @@ tv:addNodeWithChilds("Windows", "Win7", "Win8", "Win10", "Win11")
 tv:addNodeWithChilds("Linux", "openSUSE Leap 15.3", "Debian 11", "Fedora 35", "Ubuntu 22.04 LTS")
 tv:addNodeWithChilds("MacOS", "Mojave (10.14)", "Catalina (10.15)", " Big Sur (11.0)", "Monterey (12.0)")
 
+--Let's add a tray icon
+local tic = TrayIcon.new("Nforms Tray_Icon", "nf-icon.ico")
+
+--Add a function to handle tray icon click
+local function tray_click(p: pointer, e: *EventArgs)
+	print("tray icon clicked")
+end
+tic.onLeftClick = &tray_click
+
 function onTrackChange(bn: pointer, e: *EventArgs)
 	pgb:setValue(tkb.value)
 end
