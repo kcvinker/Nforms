@@ -3,7 +3,26 @@
 
 --[[-----------------------In this module--------------------------
 TrayIcon record and it's features.
+	Functions:
+		TrayIcon.new() = constructor
+		
+	Properties:
+		menuTrigger : TrayMenuTrigger (Determine which button could trigger a context menu)
+		contextMenu : *ContextMenu (Context menu for this tray icon)
+		userData : pointer (A void pointer to hookup user defined data)
 
+	Events: (All events are EventHandler type - void function(pointer, *EventArgs))
+		onBalloonShow - When balloon notification appears
+		onBalloonClose - When balloon notification vanished
+		onBalloonClick - When user click on balloon notification
+		onMouseMove - When mouse moved upon tray icon
+		onLeftMouseDown - When left mouse down upon tray icon
+		onLeftMouseUp - When left mouse up on tray icon     
+		onRightMouseDown - When right mouse down upon tray icon 
+		onRightMouseUp - When right mouse up on tray icon 
+		onLeftClick - When left mouse clicked upon tray icon 
+		onRightClick - When right mouse clicked upon tray icon 
+		onLeftDoubleClick - When left mouse double clicked upon tray icon 
 
 ]]
 
