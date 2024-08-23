@@ -201,15 +201,16 @@ ContextMenu = @record
 	height: integer,
 
 	_dummyHwnd: HWND,
+	_trayHwnd: HWND,
+	_defBgBrush: HBRUSH,
+	_hotBgBrush: HBRUSH,
+	_borderBrush: HBRUSH,
+	_grayBrush: HBRUSH,
 	_selTxtClr : COLORREF,
 	_grayCref : COLORREF,
 	_menuCount: integer,
 	_rightClick: boolean,
 	_menuInserted: boolean,
-	_defBgBrush: HBRUSH,
-	_hotBgBrush: HBRUSH,
-	_borderBrush: HBRUSH,
-	_grayBrush: HBRUSH,
 
 	onMenuShown : ContextMenuEventHandler,
 	onMenuClose : ContextMenuEventHandler,
@@ -1224,7 +1225,7 @@ global TrayIcon = @record {
 		onLeftMouseUp: EventHandler,    
 		onRightMouseDown: EventHandler,
 		onRightMouseUp: EventHandler,
-		onLeftClick: EventHandler,
+		onClick: EventHandler,
 		onRightClick: EventHandler,
 		onLeftDoubleClick: EventHandler
 }

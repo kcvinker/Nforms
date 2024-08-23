@@ -88,11 +88,14 @@ tv:addNodeWithChilds("MacOS", "Mojave (10.14)", "Catalina (10.15)", " Big Sur (1
 --Let's add a tray icon
 local tic = TrayIcon.new("Nforms Tray_Icon", "nf-icon.ico")
 
+--Add a context menu for this tray icon
+tic:addContextMenu(TrayMenuTrigger.rightClick, {"Windows", "Linux", "MacOS", "|", "ReactOS"})
+
 --Add a function to handle tray icon click
-local function tray_click(p: pointer, e: *EventArgs)
-	print("tray icon clicked")
+local function traymenu_click(p: *MenuItem, e: *EventArgs)
+	print("tray menu clicked")
 end
-tic.onLeftClick = &tray_click
+tic.contextMenu.menus["Linux"].onClick = &traymenu_click
 
 
 function onTrackChange(bn: pointer, e: *EventArgs)

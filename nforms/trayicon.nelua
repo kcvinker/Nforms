@@ -5,7 +5,7 @@
 TrayIcon record and it's features.
 	Functions:
 		TrayIcon.new() = constructor
-		
+
 	Properties:
 		menuTrigger : TrayMenuTrigger (Determine which button could trigger a context menu)
 		contextMenu : *ContextMenu (Context menu for this tray icon)
@@ -115,6 +115,13 @@ function TrayIcon.new(tooltip: string, iconpath: string) : *TrayIcon
     return this
 end
 
+function TrayIcon:addContextMenu(trigger: TrayMenuTrigger, items: span(string))
+	self.contextMenu = ContextMenu.newForTray(self)
+	self.contextMenu:addItems(items)
+    self._cmenuUsed = true
+    self.menuTrigger = trigger
+end
+
 function TrayIcon:resetIconInternal()
 	self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
     self._nid.hIcon = self._hTrayIcon
@@ -199,9 +206,9 @@ function trayWndProc(hw: HWND, msg: cuint, wpm: WPARAM, lpm: LPARAM): LRESULT
             	local ea: EventArgs = {}
             	this.onLeftMouseUp(this, &ea)
             end
-            if this.onLeftClick ~= nilptr then
+            if this.onClick ~= nilptr then
             	local ea: EventArgs = {}
-            	this.onLeftClick(this, &ea)
+            	this.onClick(this, &ea)
             end
             if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.leftClick then 
                 this.contextMenu:show(0)
