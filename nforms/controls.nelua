@@ -1204,6 +1204,7 @@ global Timer = @record {
 	-- _parent: *Form,
 }
 
+global BalloonIcon = @enum { none = 0, info, warning, wrror, custom}
 global TrayMenuTrigger = @enum {none = 0, leftClick, leftDoubleClick, rightClick }
 global TrayIcon = @record {
 		menuTrigger: TrayMenuTrigger, --public members

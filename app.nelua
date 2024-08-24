@@ -97,6 +97,11 @@ local function traymenu_click(p: *MenuItem, e: *EventArgs)
 end
 tic.contextMenu.menus["Linux"].onClick = &traymenu_click
 
+--Lets show a balloon text in try on button click.
+local function b3Click(p: pointer, e: *EventArgs)
+	tic:showBalloon{"Nforms Balloon", "This is Nforms Balloon Text", 2500}
+end
+b3.onClick = &b3Click
 
 function onTrackChange(bn: pointer, e: *EventArgs)
 	pgb:setValue(tkb.value)

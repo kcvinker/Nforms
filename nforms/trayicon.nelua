@@ -4,7 +4,9 @@
 --[[-----------------------In this module--------------------------
 TrayIcon record and it's features.
 	Functions:
-		TrayIcon.new() = constructor
+		TrayIcon.new() = Constructor
+		showBalloon() = Showing a balloon info on tray.
+		addContextMenu() = Add a context menu to tray
 
 	Properties:
 		menuTrigger : TrayMenuTrigger (Determine which button could trigger a context menu)
@@ -23,6 +25,7 @@ TrayIcon record and it's features.
 		onLeftClick - When left mouse clicked upon tray icon 
 		onRightClick - When right mouse clicked upon tray icon 
 		onLeftDoubleClick - When left mouse double clicked upon tray icon 
+
 
 ]]
 
@@ -113,6 +116,48 @@ function TrayIcon.new(tooltip: string, iconpath: string) : *TrayIcon
     Shell_NotifyIconW(NIM_ADD, &this._nid)
     -- io.printf("tip size %d, nid size %d\n", #tipTxt, #NOTIFYICONDATA)
     return this
+end
+
+global BalloonParams = @record {
+	title: string, 		-- Balloon title
+	message: string,  	-- Balloon text
+    timeout: uinteger, 	-- time out in milliseconds
+    noSound: boolean,  	-- Balloon timeout in ms, Do you want to play system sound?
+    icon: BalloonIcon,  -- System defined icons, but you can choose custom icon.
+    iconpath: string 	-- If icon == BalloonIcon.custom, provide an icon path
+}
+
+--Show a balloon text in tray.
+function TrayIcon:showBalloon(params: BalloonParams)
+	local bTitle = toWstrArray(params.title)
+	local bMsg = toWstrArray(params.message)
+	local tmout: uinteger = params.timeout == 0 and 3000 or params.timeout
+	if params.icon == BalloonIcon.custom and params.iconpath == "" then
+		params.icon = BalloonIcon.info 
+	end
+	self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_INFO
+    for i, v in ipairs(bTitle.data) do self._nid.balloonTitle[i] = v end
+    for i, v in ipairs(bMsg.data) do self._nid.balloonText[i] = v end
+    if params.icon == BalloonIcon.custom and params.iconpath ~= "" then
+        self._nid.hIcon =  LoadImageW(nilptr, toUTF16(params.iconpath), IMAGE_ICON, 0, 0, LIMG_FLAG)
+        if self._nid.hIcon == nilptr then 
+            self._nid.hIcon = self._hTrayIcon
+        else
+            --[[---------------------------------------------------------------------
+            We successfully created an icon handle from 'iconpath' parameter.
+            So, for this balloon, we will show this icon. But We need to... 
+            reset the old icon after this balloon vanished. Otherwise, from now on 
+            we need to use this icon in Balloons and tray.
+            --------------------------------------------------------------------------]]
+            self._resetIcon = true
+       	end
+    end
+    self._nid.dwInfoFlags = (@DWORD)(params.icon)
+    self._nid.dummy.uTimeout = tmout
+    if params.noSound then self._nid.dwInfoFlags = self._nid.dwInfoFlags | NIIF_NOSOUND end
+    Shell_NotifyIconW(NIM_MODIFY, &self._nid)
+    self._nid.dwInfoFlags = 0
+    self._nid.uFlags = 0
 end
 
 function TrayIcon:addContextMenu(trigger: TrayMenuTrigger, items: span(string))
