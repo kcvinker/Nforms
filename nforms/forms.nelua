@@ -992,7 +992,7 @@ end
 		if self.kind == MenuType.ContextMenu then
             self:insertMenuInternal()
         elseif self.kind == MenuType.Separator then
-            AppendMenuW(self.handle, MF_SEPARATOR, 0, nilptr)
+            AppendMenuW(self.parentHandle, MF_SEPARATOR, 0, nilptr)
         end
 	end
 
@@ -1019,6 +1019,7 @@ end
 	            local mi = MenuItem.new(item, mtyp, self.handle, self._menuCount)
 	            self._menuCount = self._menuCount + 1
 	            self.menus[item] = mi
+	            -- io.printf("menu name: %s, type: %s\n", item, mtyp)
 			end
 		end
     end
@@ -1137,7 +1138,7 @@ end
 	                FrameRect(dis.hDC, &rc, this._borderBrush)
 	                txtClrRef = 0x00000000
 	            else
-	                FillRect(dis.hDC, &dis.rcItem, this._grayBrush)
+	                -- FillRect(dis.hDC, &dis.rcItem, this._grayBrush)
 	                txtClrRef = this._grayCref
 	            end
 	        else
@@ -1145,7 +1146,7 @@ end
 	            if not mi._isEnabled then txtClrRef = this._grayCref end
 	        end
 
-	        SetBkMode(dis.hDC, 1)
+	        SetBkMode(dis.hDC, 1) --Transparent
 	        dis.rcItem.left = dis.rcItem.left + 25
 	        SelectObject(dis.hDC, this.font.handle)
 	        SetTextColor(dis.hDC, txtClrRef)
