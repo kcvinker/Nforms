@@ -1138,7 +1138,7 @@ end
 	                FrameRect(dis.hDC, &rc, this._borderBrush)
 	                txtClrRef = 0x00000000
 	            else
-	                -- FillRect(dis.hDC, &dis.rcItem, this._grayBrush)
+	                FillRect(dis.hDC, &dis.rcItem, this._grayBrush)
 	                txtClrRef = this._grayCref
 	            end
 	        else
