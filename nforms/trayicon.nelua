@@ -118,6 +118,31 @@ function TrayIcon.new(tooltip: string, iconpath: string) : *TrayIcon
     return this
 end
 
+function TrayIcon:updateTooltip(tooltip: string)
+    self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP -- this is for safety,'cause flags might be zero.
+    local tipTxt = toWstrArray(tooltip)
+    for i, v in ipairs(tipTxt.data) do
+		if i > 128  then break end
+		this._nid.szTip[i] =  v
+	end
+    Shell_NotifyIconW(NIM_MODIFY, &self._nid)
+    -- ptf("tooltip update result - %d", x);
+end
+
+function TrayIcon:updateIcon(iconpath: string)
+	self._hTrayIcon = LoadImageW(null, toUTF16(iconpath), IMAGE_ICON, 0, 0, LIMG_FLAG)
+    if self._hTrayIcon == nilptr then 
+        self._hTrayIcon = LoadIconW(null, IDI_WINLOGO)
+        io.printf("Can't create icon with %s\n", iconpath)  
+    end
+    self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP -- this is for safety,'cause flags might be zero.  
+    self._nid.hIcon = self._hTrayIcon       
+    Shell_NotifyIconW(NIM_MODIFY, &self._nid)
+end
+
+
+
+
 global BalloonParams = @record {
 	title: string, 		-- Balloon title
 	message: string,  	-- Balloon text
