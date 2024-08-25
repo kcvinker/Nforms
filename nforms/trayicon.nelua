@@ -123,16 +123,16 @@ function TrayIcon:updateTooltip(tooltip: string)
     local tipTxt = toWstrArray(tooltip)
     for i, v in ipairs(tipTxt.data) do
 		if i > 128  then break end
-		this._nid.szTip[i] =  v
+		self._nid.szTip[i] =  v
 	end
     Shell_NotifyIconW(NIM_MODIFY, &self._nid)
     -- ptf("tooltip update result - %d", x);
 end
 
 function TrayIcon:updateIcon(iconpath: string)
-	self._hTrayIcon = LoadImageW(null, toUTF16(iconpath), IMAGE_ICON, 0, 0, LIMG_FLAG)
+	self._hTrayIcon = LoadImageW(nilptr, toUTF16(iconpath), IMAGE_ICON, 0, 0, LIMG_FLAG)
     if self._hTrayIcon == nilptr then 
-        self._hTrayIcon = LoadIconW(null, IDI_WINLOGO)
+        self._hTrayIcon = LoadIconW(nilptr, IDI_WINLOGO)
         io.printf("Can't create icon with %s\n", iconpath)  
     end
     self._nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP -- this is for safety,'cause flags might be zero.  
@@ -280,7 +280,7 @@ function trayWndProc(hw: HWND, msg: cuint, wpm: WPARAM, lpm: LPARAM): LRESULT
             	local ea: EventArgs = {}
             	this.onClick(this, &ea)
             end
-            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.leftClick then 
+            if this._cmenuUsed and (this.menuTrigger & TrayMenuTrigger.leftClick) == 1 then 
                 this.contextMenu:show(0)
             end
 
@@ -290,7 +290,7 @@ function trayWndProc(hw: HWND, msg: cuint, wpm: WPARAM, lpm: LPARAM): LRESULT
             	local ea: EventArgs = {}
             	this.onLeftDoubleClick(this, &ea)
             end
-            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.leftDoubleClick then 
+            if this._cmenuUsed and (this.menuTrigger & TrayMenuTrigger.leftDoubleClick) == 2 then 
                 this.contextMenu:show(0)
             end
 
@@ -311,7 +311,7 @@ function trayWndProc(hw: HWND, msg: cuint, wpm: WPARAM, lpm: LPARAM): LRESULT
             	local ea: EventArgs = {}
             	this.onRightClick(this, &ea)
             end
-            if this._cmenuUsed and this.menuTrigger == TrayMenuTrigger.rightClick then 
+            if this._cmenuUsed and (this.menuTrigger & TrayMenuTrigger.rightClick) == 4 then 
                 this.contextMenu:show(0)
             end
 

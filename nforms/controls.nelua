@@ -1205,7 +1205,7 @@ global Timer = @record {
 }
 
 global BalloonIcon = @enum { none = 0, info, warning, wrror, custom}
-global TrayMenuTrigger = @enum {none = 0, leftClick, leftDoubleClick, rightClick }
+global TrayMenuTrigger = @enum {none = 0, leftClick, leftDoubleClick, rightClick = 4, anyClick = 7 }
 global TrayIcon = @record {
 		menuTrigger: TrayMenuTrigger, --public members
 		contextMenu: *ContextMenu,
