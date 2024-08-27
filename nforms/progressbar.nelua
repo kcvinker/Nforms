@@ -35,7 +35,7 @@ function ProgressBar:createHandle() <forwarddecl> end
 global ProgressBarParams = @record
 {
 	parent: *Form, xpos: integer, ypos: integer,
-	width: integer, height: integer,  create: boolean, perc: boolean
+	width: integer, height: integer, perc: boolean
 }
 
 -- Public function
@@ -64,7 +64,7 @@ function ProgressBar.new(params: ProgressBarParams) : *ProgressBar
     pbNumber = pbNumber + 1
     this.showPercentage = params.perc
 	params.parent._cidNumber = params.parent._cidNumber + 1
-	if params.create then this:createHandle() end
+	if params.parent.createChilds then this:createHandle() end
 	return this
 end
 

@@ -39,7 +39,7 @@ function Button:createHandle() <forwarddecl> end
 global ButtonParams = @record
 {
 	parent: *Form, text: string, xpos: integer, ypos: integer,
-	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+	width: integer, height: integer,  evtFn: EventHandler
 }
 
 -- Public function
@@ -63,7 +63,7 @@ function Button.new(params: ButtonParams) : *Button
 	this.parent._controls:push({this, ControlType.Button})
 	params.parent._cidNumber = params.parent._cidNumber + 1
 	-- testControl(this)
-	if params.create then this:createHandle() end
+	if params.parent.createChilds then this:createHandle() end
 
 	return this
 end

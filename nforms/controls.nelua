@@ -80,6 +80,7 @@ global Form = @record
 	maximizeBox: boolean,
 	minimizeBox: boolean,
 	topMost: boolean,
+	createChilds: boolean,
 	formState: FormState,
 	formPos: FormPosition,
 	hInstance : HINSTANCE,

@@ -94,7 +94,7 @@ local function dtpWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: U
 function DateTimePicker:createHandle() <forwarddecl> end
 global DateTimePickerParams = @record
 {
-	parent: *Form, xpos: integer, ypos: integer, create: boolean
+	parent: *Form, xpos: integer, ypos: integer
 }
 
 -- Public function
@@ -121,7 +121,7 @@ function DateTimePicker.new(params: DateTimePickerParams) : *DateTimePicker
 		app.iccEx.dwICC = ICC_DATE_CLASSES
 		InitCommonControlsEx(&app.iccEx)
 	end
-	if params.create then this:createHandle() end
+	if params.parent.createChilds then this:createHandle() end
 	return this
 end
 

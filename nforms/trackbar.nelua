@@ -93,7 +93,7 @@ local function tkWndProc(hw: HWND, msg: UINT, wpm: WPARAM, lpm: LPARAM, scID: UI
 global TrackBarParams = @record
 {
 	parent: *Form, xpos: integer, ypos: integer, cdraw: boolean,
-	width: integer, height: integer,  create: boolean, evtFn: EventHandler
+	width: integer, height: integer, evtFn: EventHandler
 }
 
 function TrackBar:createHandle() <forwarddecl> end
@@ -132,7 +132,7 @@ function TrackBar.new(params: TrackBarParams) : *TrackBar
     tkNumber = tkNumber + 1
 	params.parent._cidNumber = params.parent._cidNumber + 1
 	this.onValueChanged = params.evtFn
-	if params.create then this:createHandle() end
+	if params.parent.createChilds then this:createHandle() end
 	return this
 end
 

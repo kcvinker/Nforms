@@ -39,7 +39,7 @@ function ComboBox:createHandle() <forwarddecl> end
 global ComboBoxParams = @record
 {
 	parent: *Form, xpos: integer, ypos: integer,
-	width: integer, height: integer,  create: boolean
+	width: integer, height: integer
 }
 
 -- Public function
@@ -62,7 +62,7 @@ function ComboBox.new(params: ComboBoxParams) : *ComboBox
   	cmbNumber = cmbNumber + 1
 	params.parent._cidNumber = params.parent._cidNumber + 1
 	this.parent._controls:push({this, ControlType.ComboBox})
-	if params.create then this:createHandle() end
+	if params.parent.createChilds then this:createHandle() end
 	return this
 end
 
