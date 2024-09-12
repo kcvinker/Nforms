@@ -1,5 +1,14 @@
 
 -- DateTimePicker module - Created on 15-Mar-2023 06:57 PM
+--[[
+	For properties & Events, see the declaration of DateTimePicker record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of DateTimePicker record
+	---------------------------------------
+	DateTimePicker.new - Constructor
+	createHandle - Create handle of DateTimePicker	
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"

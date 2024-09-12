@@ -1,5 +1,14 @@
 
 -- Calendar module - Created on 15-Mar-2023 06:57 PM
+--[[
+	For properties & Events, see the declaration of Calendar record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of Calendar record
+	---------------------------------------
+	Calendar.new - Constructor
+	createHandle - Create handle of Calendar
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -119,6 +128,8 @@ function Calendar:createHandle()
 		self:setSizeAndValue()
 	end
 end
+
+
 
 --Private function
 function Calendar:destroy()

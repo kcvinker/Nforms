@@ -1,5 +1,19 @@
 
 -- Label module - Created on 10-Mar-2023 03:02 PM
+--[[
+	For properties & Events, see the declaration of Label record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of Label record
+	---------------------------------------
+	Label.new - Constructor
+	createHandle - Create handle of Label
+	addContextMenu
+	setText
+	getText
+	setForeColor
+	setBackColor	
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"

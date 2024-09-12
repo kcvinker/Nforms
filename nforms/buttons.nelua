@@ -1,7 +1,7 @@
 
 -- button module - Created on 27-Feb-2023
 --[[
-	For properties & Events, see the declaration of Button record.
+	For properties & Events, see the declaration of Button record in controls.nelu.
 	Private fields are starting with underscore.
 
 	Important functions of Button record

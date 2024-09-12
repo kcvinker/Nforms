@@ -1,5 +1,26 @@
 
 -- ComboBox module - Created on 10-Mar-2023 08:06 PM
+--[[
+	For properties & Events, see the declaration of ComboBox record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of ComboBox record
+	---------------------------------------
+	ComboBox.new - Constructor
+	createHandle - Create handle of ComboBox
+	addContextMenu
+	addItem
+	addItems
+	getSelectedIndex
+	setSelectedIndex
+	getSelectedItem
+	changeStyle
+	removeItem
+	removeItemAt
+	removeAll
+	setForeColor
+	setBackColor
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"

@@ -302,7 +302,7 @@ global Calendar = @record {
     noToday : boolean,
     noTrailingDates : boolean,
     shortDayNames : boolean,
-    contextMenu: *ContextMenu,
+    contextMenu: *ContextMenu, 
 
 	--Private fields
 	_isCreated: boolean,

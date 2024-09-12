@@ -1,5 +1,20 @@
 
 -- GroupBox module - Created on 16-Mar-2023 11:54 PM
+--[[
+	For properties & Events, see the declaration of GroupBox record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of GroupBox record
+	---------------------------------------
+	GroupBox.new - Constructor
+	createHandle - Create handle of GroupBox
+	addContextMenu
+	setText
+	getText
+	setForeColor
+	setBackColor
+	
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"

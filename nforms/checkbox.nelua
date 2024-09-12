@@ -1,5 +1,20 @@
 
 -- CheckBox module - Created on 10-Mar-2023 04:57 PM
+--[[
+	For properties & Events, see the declaration of CheckBox record in controls.nelu.
+	Private fields are starting with underscore.
+
+	Important functions of CheckBox record
+	---------------------------------------
+	CheckBox.new - Constructor
+	createHandle - Create handle of CheckBox
+	addContextMenu
+	setText
+	getText
+	setForeColor
+	setBackColor
+	setState
+]]
 
 require "nforms.api_messages"
 require "nforms.apifuncs"
@@ -63,6 +78,7 @@ function CheckBox:setCbStyle()
     self._bkBrush = CreateSolidBrush(self.backColor.ref)
 end
 
+--Public function
 function CheckBox:addContextMenu(items: span(string))
 	self.contextMenu = ContextMenu.new(self)
 	self.contextMenu:addItems(items)
@@ -113,6 +129,14 @@ function CheckBox:setBackColor(clr: uinteger)
 	self._bkBrush = CreateSolidBrush(self.backColor.ref)
 	if (self._drawFlag & 2) ~= 2 then self._drawFlag = self._drawFlag + 2 end
 	invalidateNow(self)
+end
+
+function CheckBox:setState(value: boolean)
+	self.checked = value
+	if self._isCreated then
+		local bState : integer = value and 1 or 0
+		sendMsg(self, BM_SETCHECK, bState, 0)
+	end
 end
 
 --Private function
